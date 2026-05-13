@@ -1,0 +1,75 @@
+# ───────────────────────────────
+# Python
+# ───────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual Environment
+venv/
+.venv/
+env/
+ENV/
+
+# ───────────────────────────────
+# Datenbank (niemals teilen!)
+# ───────────────────────────────
+*.db
+*.sqlite
+*.sqlite3
+data/
+
+# ───────────────────────────────
+# Flask
+# ───────────────────────────────
+instance/
+.flask_session/
+
+# ───────────────────────────────
+# Uploads (Bilder/Sticker)
+# ───────────────────────────────
+app/static/uploads/*
+!app/static/uploads/.gitkeep
+
+# ───────────────────────────────
+# Umgebungsvariablen
+# ───────────────────────────────
+.env
+.env.*
+*.env
+
+# ───────────────────────────────
+# PyCharm / JetBrains
+# ───────────────────────────────
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# ───────────────────────────────
+# Betriebssystem
+# ───────────────────────────────
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# ───────────────────────────────
+# Logs & temporäre Dateien
+# ───────────────────────────────
+*.log
+*.tmp
+*.bak
+*.swp
