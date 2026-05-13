@@ -1,0 +1,309 @@
+{% extends "base.html" %}
+{% block title %}Dokumente – Vault{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Dokumente</h1>
+    <p class="page-sub">Kontoauszüge, Rechnungen & automatischer Import</p>
+  </div>
+</div>
+
+<!-- Upload zone -->
+<div class="card">
+  <div class="upload-zone" id="uploadZone" onclick="document.getElementById('docFileIn').click()"
+       ondragover="event.preventDefault();this.classList.add('drag-over')"
+       ondragleave="this.classList.remove('drag-over')"
+       ondrop="handleDocDrop(event)">
+    <div class="upload-zone-icon">📊</div>
+    <h3>CSV-Kontoauszug hierher ziehen</h3>
+    <p>oder klicken zum Auswählen · <strong>CSV empfohlen</strong> · auch PDF, PNG, JPG · max. 20 MB</p>
+    <input type="file" id="docFileIn" accept=".csv,.pdf,.png,.jpg,.jpeg" style="display:none" onchange="handleDocUpload(event)">
+  </div>
+
+  <div style="margin-top:1rem;padding:1rem;border-radius:12px;background:var(--indigo-dim);border:1px solid var(--indigo-dim);font-size:.85rem;line-height:1.7">
+    <strong style="color:var(--indigo)">💡 CSV-Export deiner Bank:</strong><br>
+    <span style="color:var(--text-2)">
+      <b>DKB</b>: Banking → Umsätze → Export (CSV) &nbsp;·&nbsp;
+      <b>Sparkasse</b>: Kontoumsätze → Exportieren → CSV &nbsp;·&nbsp;
+      <b>ING</b>: Umsätze → Download (CSV) &nbsp;·&nbsp;
+      <b>Commerzbank</b>: Umsätze → Export &nbsp;·&nbsp;
+      <b>N26</b>: Statistiken → CSV Export
+    </span>
+  </div>
+
+  <div style="display:flex;gap:1rem;margin-top:1rem;flex-wrap:wrap;align-items:center">
+    <label style="text-transform:none;font-size:.88rem;font-weight:600;color:var(--text-2)">Dokumenttyp:</label>
+    <select id="docType" style="width:auto">
+      <option value="bank_statement">🏦 Kontoauszug</option>
+      <option value="invoice">🧾 Rechnung</option>
+      <option value="receipt">🛒 Kassenbon</option>
+      <option value="other">📄 Sonstiges</option>
+    </select>
+  </div>
+  <div id="uploadProgress" class="hidden" style="margin-top:1rem">
+    <div class="loading-state" style="padding:1rem">
+      <div class="spinner"></div>
+      <p>Dokument wird hochgeladen und gescannt…</p>
+    </div>
+  </div>
+</div>
+
+<!-- Document list -->
+<div class="card">
+  <div class="card-header">
+    <h3>Gespeicherte Dokumente</h3>
+    <span class="card-sub">{{ documents|length }} Dokument{% if documents|length != 1 %}e{% endif %}</span>
+  </div>
+
+  {% if documents %}
+  <div class="doc-list">
+    {% for doc in documents %}
+    <div class="doc-item" id="doc-{{ doc.id }}">
+      <div class="doc-icon">
+        {% if doc.doc_type == 'bank_statement' %}🏦
+        {% elif doc.doc_type == 'invoice' %}🧾
+        {% elif doc.doc_type == 'receipt' %}🛒
+        {% else %}📄{% endif %}
+      </div>
+      <div class="doc-info">
+        <div class="doc-name">{{ doc.original_name }}</div>
+        <div class="doc-meta">
+          <span>{{ doc.upload_date.strftime('%d.%m.%Y %H:%M') }}</span>
+          <span>{{ doc.page_count }} Seite{% if doc.page_count != 1 %}n{% endif %}</span>
+          <span class="doc-status-badge {{ doc.status }}">{{ doc.STATUSES.get(doc.status, doc.status) }}</span>
+          <span>{{ doc.get_extracted()|length }} Transaktionen erkannt</span>
+        </div>
+      </div>
+      <div class="doc-actions">
+        {% if doc.status in ['scanned'] %}
+        <button class="btn-primary" onclick="openReview({{ doc.id }})">🔍 Prüfen & Importieren</button>
+        {% elif doc.status == 'imported' %}
+        <button class="btn-ghost" onclick="openReview({{ doc.id }})">📋 Anzeigen</button>
+        {% endif %}
+        <a href="/api/documents/{{ doc.id }}/file" target="_blank" class="btn-secondary">👁️</a>
+        <button class="icon-btn-sm danger" onclick="confirmDeleteDoc({{ doc.id }})">🗑️</button>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <span>📂</span>
+    <p>Noch keine Dokumente hochgeladen.<br>Lade einen Kontoauszug hoch um Transaktionen automatisch zu erkennen.</p>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Review Modal -->
+<div class="modal modal-xl" id="reviewModal">
+  <div class="modal-header">
+    <h2 class="modal-title" id="reviewTitle">Transaktionen prüfen</h2>
+    <button class="modal-close" onclick="closeModal()">✕</button>
+  </div>
+
+  <!-- Tab bar -->
+  <div style="display:flex;gap:.4rem;margin-bottom:1rem">
+    <button class="ct-btn active" id="tabTx"  onclick="switchReviewTab('tx')">📋 Erkannte Positionen</button>
+    <button class="ct-btn"        id="tabRaw" onclick="switchReviewTab('raw')">🔍 OCR-Rohtext</button>
+  </div>
+
+  <div id="reviewTabTx">
+    <p style="color:var(--text-2);font-size:.82rem;margin-bottom:.85rem">
+      ✓ = wird importiert. Beschreibung, Betrag und Kategorie können direkt bearbeitet werden.
+    </p>
+    <div id="reviewContent"></div>
+    <button class="btn-ghost" style="margin-top:.75rem;font-size:.82rem" onclick="addManualRow()">＋ Zeile manuell hinzufügen</button>
+  </div>
+
+  <div id="reviewTabRaw" class="hidden">
+    <p style="color:var(--text-2);font-size:.82rem;margin-bottom:.75rem">
+      Das ist der rohe OCR-Text. Wenn er schlecht aussieht, war das Bild zu unscharf oder zu dunkel.
+    </p>
+    <pre id="rawTextBox" style="background:var(--glass-2);border:1px solid var(--border);border-radius:var(--radius-sm);
+         padding:1rem;font-size:.75rem;line-height:1.6;overflow:auto;max-height:400px;
+         white-space:pre-wrap;word-break:break-word;color:var(--text-2)"></pre>
+  </div>
+
+  <div class="modal-actions">
+    <button class="btn-ghost" onclick="closeModal()">Abbrechen</button>
+    <button class="btn-primary" onclick="importReviewed()" id="importBtn">📥 Auswahl importieren</button>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const DOC_CATEGORIES = {{ categories | tojson }};
+let _reviewDocId  = null;
+let _reviewData   = [];
+let _reviewRawTxt = '';
+
+function switchReviewTab(tab) {
+  document.getElementById('reviewTabTx').classList.toggle('hidden', tab !== 'tx');
+  document.getElementById('reviewTabRaw').classList.toggle('hidden', tab !== 'raw');
+  document.getElementById('tabTx').classList.toggle('active',  tab === 'tx');
+  document.getElementById('tabRaw').classList.toggle('active', tab === 'raw');
+}
+
+function handleDocDrop(e) {
+  e.preventDefault();
+  document.getElementById('uploadZone').classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file) uploadDoc(file);
+}
+function handleDocUpload(e) {
+  const file = e.target.files[0];
+  if (file) uploadDoc(file);
+}
+
+async function uploadDoc(file) {
+  const maxMB = 20;
+  if (file.size > maxMB * 1024 * 1024) { showToast(`Max ${maxMB} MB erlaubt`, 'error'); return; }
+  const prog = document.getElementById('uploadProgress');
+  prog.classList.remove('hidden');
+  const fd = new FormData();
+  fd.append('file', file);
+  fd.append('doc_type', document.getElementById('docType').value);
+  const resp = await fetch('/api/documents/upload', { method: 'POST', body: fd });
+  const data = await resp.json();
+  prog.classList.add('hidden');
+  if (data.success) {
+    const n = data.transactions.length;
+    showToast(n > 0 ? `${n} Position(en) erkannt` : 'Hochgeladen – bitte manuell prüfen', n > 0 ? 'success' : 'warning', 4000);
+    setTimeout(() => location.reload(), 1200);
+  } else {
+    showToast(data.error || 'Upload fehlgeschlagen', 'error');
+  }
+}
+
+async function openReview(docId) {
+  _reviewDocId = docId;
+  const resp = await fetch(`/api/documents/${docId}/extracted`);
+  const data = await resp.json();
+  _reviewData   = data.transactions || [];
+  _reviewRawTxt = data.document?.raw_text || '';
+  document.getElementById('reviewTitle').textContent = data.document.original_name;
+  document.getElementById('rawTextBox').textContent  = _reviewRawTxt || '(kein Text extrahiert)';
+  switchReviewTab('tx');
+  renderReviewTable();
+  openModal('reviewModal');
+}
+
+function catOptions(selectedId) {
+  return `<option value="">— Kategorie —</option>` +
+    DOC_CATEGORIES.map(c =>
+      `<option value="${c.id}" ${String(selectedId)===String(c.id)?'selected':''}>${c.emoji} ${escHtml(c.name)}</option>`
+    ).join('');
+}
+
+function renderReviewTable() {
+  const wrap = document.getElementById('reviewContent');
+
+  if (!_reviewData.length) {
+    wrap.innerHTML = `
+      <div style="padding:1.5rem;border-radius:var(--radius-sm);background:var(--warning-dim);
+                  border:1px solid var(--warning-dim);margin-bottom:1rem">
+        <p style="font-weight:700;color:var(--warning);margin-bottom:.5rem">⚠️ Keine Positionen automatisch erkannt</p>
+        <p style="font-size:.83rem;color:var(--text-2);line-height:1.6">
+          Mögliche Ursachen: Bild zu unscharf / zu dunkel, niedriger Kontrast, handschriftlicher Text.<br>
+          Tipp: Schau im „OCR-Rohtext"-Tab was erkannt wurde. Du kannst Zeilen auch manuell hinzufügen.
+        </p>
+      </div>`;
+    return;
+  }
+
+  wrap.innerHTML = `
+    <div style="overflow-x:auto">
+    <table class="review-table" id="reviewTable">
+      <thead><tr>
+        <th style="width:32px">✓</th>
+        <th>Datum</th>
+        <th>Beschreibung</th>
+        <th>Betrag €</th>
+        <th>Typ</th>
+        <th>Kategorie</th>
+        <th style="width:32px"></th>
+      </tr></thead>
+      <tbody id="reviewTbody">` +
+    _reviewData.map((t,i) => reviewRow(t,i)).join('') +
+    `</tbody>
+    </table></div>
+    <p id="reviewCount" style="margin-top:.65rem;color:var(--text-3);font-size:.78rem"></p>`;
+  updateReviewCount();
+}
+
+function reviewRow(t, i) {
+  return `<tr id="rev-row-${i}" class="${t.include?'':'excluded'}">
+    <td><input type="checkbox" ${t.include?'checked':''} onchange="toggleRow(${i},this.checked)"></td>
+    <td><input type="date" value="${t.date}" onchange="_reviewData[${i}].date=this.value" style="min-width:120px"></td>
+    <td><input type="text" value="${escHtml(t.description)}" oninput="_reviewData[${i}].description=this.value" style="min-width:160px"></td>
+    <td><input type="number" value="${t.amount}" step="0.01" min="0.01" onchange="_reviewData[${i}].amount=parseFloat(this.value)||0" style="width:90px"></td>
+    <td><select onchange="_reviewData[${i}].type=this.value">
+      <option value="expense" ${t.type==='expense'?'selected':''}>📤 Ausgabe</option>
+      <option value="income"  ${t.type==='income' ?'selected':''}>📥 Einnahme</option>
+    </select></td>
+    <td><select onchange="_reviewData[${i}].category_id=this.value||null">${catOptions(t.category_id)}</select></td>
+    <td><button class="icon-btn-sm danger" onclick="removeReviewRow(${i})" title="Zeile entfernen">✕</button></td>
+  </tr>`;
+}
+
+function toggleRow(i, checked) {
+  _reviewData[i].include = checked;
+  document.getElementById(`rev-row-${i}`)?.classList.toggle('excluded', !checked);
+  updateReviewCount();
+}
+
+function removeReviewRow(i) {
+  _reviewData.splice(i, 1);
+  renderReviewTable();
+}
+
+function addManualRow() {
+  const today = new Date().toISOString().split('T')[0];
+  _reviewData.push({ date: today, description: '', amount: 0, type: 'expense', include: true, category_id: null, emoji: '' });
+  // If table doesn't exist yet, render it first
+  if (!document.getElementById('reviewTbody')) renderReviewTable();
+  else {
+    const i = _reviewData.length - 1;
+    const tbody = document.getElementById('reviewTbody');
+    tbody.insertAdjacentHTML('beforeend', reviewRow(_reviewData[i], i));
+    updateReviewCount();
+  }
+}
+
+function updateReviewCount() {
+  const el = document.getElementById('reviewCount');
+  if (el) el.textContent = `${_reviewData.filter(t=>t.include).length} von ${_reviewData.length} zum Import ausgewählt`;
+}
+
+async function importReviewed() {
+  const toImport = _reviewData.filter(t => t.include && t.amount > 0);
+  if (!toImport.length) { showToast('Keine gültigen Einträge ausgewählt', 'warning'); return; }
+  const btn = document.getElementById('importBtn');
+  btn.textContent = '…'; btn.disabled = true;
+  const resp = await fetch(`/api/documents/${_reviewDocId}/import`, {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ transactions: _reviewData })
+  });
+  const data = await resp.json();
+  btn.textContent = '📥 Auswahl importieren'; btn.disabled = false;
+  if (data.success) {
+    showToast(`${data.imported} Transaktion(en) importiert ✓`, 'success');
+    closeModal();
+    setTimeout(() => location.reload(), 900);
+  } else {
+    showToast('Fehler beim Import', 'error');
+  }
+}
+
+function confirmDeleteDoc(id) {
+  showConfirm('Dokument wirklich löschen?', async () => {
+    const resp = await fetch(`/api/documents/${id}`, { method: 'DELETE' });
+    const data = await resp.json();
+    if (data.success) { showToast('Gelöscht', 'success'); document.getElementById(`doc-${id}`)?.remove(); }
+    else showToast(data.error, 'error');
+  });
+}
+</script>
+{% endblock %}

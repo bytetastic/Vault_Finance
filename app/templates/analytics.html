@@ -1,0 +1,400 @@
+{% extends "base.html" %}
+{% block title %}Analytik – Vault{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <div><h1 class="page-title">Analytik</h1><p class="page-sub" id="anaSubtitle">Trends &amp; Auswertungen</p></div>
+  <button class="btn-ghost" onclick="openModuleManager()">⊞ Module verwalten</button>
+</div>
+
+<!-- Period selector -->
+<div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1.5rem;align-items:center">
+  <div class="period-selector">
+    <button class="period-btn" onclick="loadPeriod('7days',this)">7 Tage</button>
+    <button class="period-btn active" onclick="loadPeriod('month',this)">Dieser Monat</button>
+    <button class="period-btn" onclick="loadPeriod('1month',this)">30 Tage</button>
+    <button class="period-btn" onclick="loadPeriod('3months',this)">3 Monate</button>
+    <button class="period-btn" onclick="loadPeriod('year',this)">1 Jahr</button>
+    <button class="period-btn" onclick="loadPeriod('all',this)">Gesamt</button>
+  </div>
+</div>
+
+<!-- KPI row -->
+<div class="stats-grid" id="anaStats" style="margin-bottom:1.5rem">
+  <div class="stat-card skeleton-card"><div class="skeleton-line"></div></div>
+  <div class="stat-card skeleton-card"><div class="skeleton-line"></div></div>
+  <div class="stat-card skeleton-card"><div class="skeleton-line"></div></div>
+  <div class="stat-card skeleton-card"><div class="skeleton-line"></div></div>
+</div>
+
+<p style="color:var(--text-3);font-size:.75rem;margin-bottom:.5rem">
+  ⠿ Ziehen zum Verschieben &nbsp;·&nbsp; ✕ Modul entfernen &nbsp;·&nbsp; ⊞ Module verwalten zum Hinzufügen
+</p>
+
+<!-- Module grid -->
+<div class="ana-modules" id="anaModules"></div>
+
+<!-- Module Manager Modal -->
+<div class="modal modal-lg" id="moduleManagerModal">
+  <div class="modal-header">
+    <h2 class="modal-title">⊞ Module verwalten</h2>
+    <button class="modal-close" onclick="closeModal()">✕</button>
+  </div>
+  <p style="color:var(--text-2);font-size:.85rem;margin-bottom:1.25rem">Aktiviere oder deaktiviere einzelne Diagramm-Module.</p>
+  <div id="moduleList" style="display:flex;flex-direction:column;gap:.6rem"></div>
+  <div class="modal-actions">
+    <button class="btn-ghost" onclick="closeModal()">Schließen</button>
+    <button class="btn-primary" onclick="applyModules()">✓ Übernehmen</button>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// ── Module registry ───────────────────────────────────────────────────────────
+const MODULE_DEFS = [
+  { id:'bar',      label:'Einnahmen & Ausgaben',     icon:'📊', wide:false,
+    render:(data)=>renderBarChart(data,'bar') },
+  { id:'balance',  label:'Bilanz-Verlauf',            icon:'📈', wide:false,
+    render:(data)=>renderBalChart(data,'line') },
+  { id:'donut',    label:'Ausgaben nach Kategorie',   icon:'🍩', wide:false,
+    render:(data)=>renderDonutChart(data.category_data,'doughnut') },
+  { id:'incdonut', label:'Einnahmen nach Kategorie',  icon:'💚', wide:false,
+    render:(data)=>renderIncDonut(data.income_category_data) },
+  { id:'cattable', label:'Kategorien Detail',         icon:'📋', wide:false,
+    render:(data)=>renderCatTable(data.category_data,'expense') },
+  { id:'heatmap',  label:'Ausgaben-Verlauf (Balken)', icon:'🌡️', wide:true,
+    render:(data)=>renderHeatmap(data.series, data.mode) },
+];
+
+let _activeModuleIds = JSON.parse(localStorage.getItem('anaModules') || 'null')
+  || ['bar','balance','donut','incdonut','cattable','heatmap'];
+
+let _lastData  = null;
+let _charts    = {};
+let _catView   = 'expense';
+let _currentPeriod = 'month';
+let _dragSrc   = null;
+
+// ── Build/render module grid ───────────────────────────────────────────────────
+function buildModuleGrid() {
+  const grid = document.getElementById('anaModules');
+  grid.innerHTML = '';
+
+  _activeModuleIds.forEach(id => {
+    const def = MODULE_DEFS.find(m => m.id === id);
+    if (!def) return;
+
+    const el = document.createElement('div');
+    el.className = 'ana-module' + (def.wide ? ' ana-module-wide' : '');
+    el.id        = 'mod-' + id;
+    el.draggable = true;
+    el.innerHTML = buildModuleHTML(def);
+    grid.appendChild(el);
+
+    // Drag events
+    el.addEventListener('dragstart', e => {
+      _dragSrc = el; el.style.opacity = '.4';
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    el.addEventListener('dragend',  () => { el.style.opacity = ''; saveModuleOrder(); });
+    el.addEventListener('dragover', e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; });
+    el.addEventListener('drop', e => {
+      e.preventDefault();
+      if (_dragSrc && _dragSrc !== el) {
+        const all = [...grid.children];
+        if (all.indexOf(_dragSrc) < all.indexOf(el)) grid.insertBefore(_dragSrc, el.nextSibling);
+        else grid.insertBefore(_dragSrc, el);
+        saveModuleOrder();
+      }
+    });
+  });
+
+  // Re-render charts into new DOM
+  if (_lastData) renderAllModules(_lastData);
+}
+
+function buildModuleHTML(def) {
+  if (def.id === 'bar') return `
+    <div class="card" style="margin:0;height:100%">
+      <div class="card-header">
+        <h3>${def.icon} ${def.label}</h3>
+        <div style="display:flex;gap:.4rem;align-items:center">
+          <div class="chart-type-btns">
+            <button class="ct-btn active" onclick="switchBarType('bar',this)">▐▌ Bar</button>
+            <button class="ct-btn"        onclick="switchBarType('line',this)">↗ Line</button>
+          </div>
+          <button class="mod-close-btn" onclick="removeModule('${def.id}')">✕</button>
+        </div>
+      </div>
+      <div style="height:260px"><canvas id="barChart"></canvas></div>
+    </div>`;
+
+  if (def.id === 'balance') return `
+    <div class="card" style="margin:0;height:100%">
+      <div class="card-header">
+        <h3>${def.icon} ${def.label}</h3>
+        <div style="display:flex;gap:.4rem;align-items:center">
+          <div class="chart-type-btns">
+            <button class="ct-btn active" onclick="switchBalType('line',this)">↗ Line</button>
+            <button class="ct-btn"        onclick="switchBalType('bar',this)">▐▌ Bar</button>
+          </div>
+          <button class="mod-close-btn" onclick="removeModule('${def.id}')">✕</button>
+        </div>
+      </div>
+      <div style="height:220px"><canvas id="balChart"></canvas></div>
+    </div>`;
+
+  if (def.id === 'donut') return `
+    <div class="card" style="margin:0;height:100%">
+      <div class="card-header">
+        <h3>${def.icon} ${def.label}</h3>
+        <div style="display:flex;gap:.4rem;align-items:center">
+          <div class="chart-type-btns">
+            <button class="ct-btn active" onclick="switchDonutType('doughnut',this)">◎ Donut</button>
+            <button class="ct-btn"        onclick="switchDonutType('pie',this)">● Pie</button>
+          </div>
+          <button class="mod-close-btn" onclick="removeModule('${def.id}')">✕</button>
+        </div>
+      </div>
+      <div style="height:240px"><canvas id="donutChart"></canvas></div>
+    </div>`;
+
+  if (def.id === 'incdonut') return `
+    <div class="card" style="margin:0;height:100%">
+      <div class="card-header">
+        <h3>${def.icon} ${def.label}</h3>
+        <button class="mod-close-btn" onclick="removeModule('${def.id}')">✕</button>
+      </div>
+      <div style="height:240px"><canvas id="incDonutChart"></canvas></div>
+    </div>`;
+
+  if (def.id === 'cattable') return `
+    <div class="card" style="margin:0;height:100%">
+      <div class="card-header">
+        <h3>${def.icon} ${def.label}</h3>
+        <div style="display:flex;gap:.4rem;align-items:center">
+          <div class="chart-type-btns">
+            <button class="ct-btn active" onclick="setCatView('expense',this)">Ausgaben</button>
+            <button class="ct-btn"        onclick="setCatView('income',this)">Einnahmen</button>
+          </div>
+          <button class="mod-close-btn" onclick="removeModule('${def.id}')">✕</button>
+        </div>
+      </div>
+      <div class="cat-table" id="anaCatTable"></div>
+    </div>`;
+
+  if (def.id === 'heatmap') return `
+    <div class="card" style="margin:0;height:100%">
+      <div class="card-header">
+        <h3>${def.icon} ${def.label}</h3>
+        <span class="card-sub" id="heatmapSub"></span>
+        <button class="mod-close-btn" onclick="removeModule('${def.id}')">✕</button>
+      </div>
+      <div id="heatmapWrap" style="overflow-x:auto;padding:.25rem 0"></div>
+    </div>`;
+
+  return `<div class="card" style="margin:0"><div class="card-header"><h3>${def.label}</h3><button class="mod-close-btn" onclick="removeModule('${def.id}')">✕</button></div></div>`;
+}
+
+// ── Module manager modal ──────────────────────────────────────────────────────
+function openModuleManager() {
+  document.getElementById('moduleList').innerHTML = MODULE_DEFS.map(def => `
+    <div style="display:flex;align-items:center;gap:1rem;padding:.7rem 1rem;
+                border-radius:var(--radius-sm);background:var(--glass);border:1px solid var(--border)">
+      <span style="font-size:1.4rem">${def.icon}</span>
+      <span style="flex:1;font-weight:600">${def.label}</span>
+      <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;text-transform:none;font-size:.88rem;letter-spacing:0">
+        <input type="checkbox" id="mchk-${def.id}" ${_activeModuleIds.includes(def.id)?'checked':''}>
+        Anzeigen
+      </label>
+    </div>`).join('');
+  openModal('moduleManagerModal');
+}
+
+function applyModules() {
+  _activeModuleIds = MODULE_DEFS
+    .filter(d => document.getElementById('mchk-'+d.id)?.checked)
+    .map(d => d.id);
+  localStorage.setItem('anaModules', JSON.stringify(_activeModuleIds));
+  closeModal();
+  buildModuleGrid();
+}
+
+function removeModule(id) {
+  _activeModuleIds = _activeModuleIds.filter(x => x !== id);
+  localStorage.setItem('anaModules', JSON.stringify(_activeModuleIds));
+  document.getElementById('mod-'+id)?.remove();
+  _charts[id]?.destroy();
+  delete _charts[id];
+}
+
+function saveModuleOrder() {
+  const order = [...document.getElementById('anaModules').children]
+    .map(el => el.id.replace('mod-',''));
+  _activeModuleIds = order;
+  localStorage.setItem('anaModules', JSON.stringify(order));
+}
+
+// ── Period loading ────────────────────────────────────────────────────────────
+async function loadPeriod(period, btn) {
+  _currentPeriod = period;
+  document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const data = await (await fetch(`/api/analytics?period=${period}`)).json();
+  data.series = data.series || data.monthly_data || [];
+  _lastData = data;
+  renderStats(data.summary);
+  renderAllModules(data);
+  const labels = {'7days':'Letzte 7 Tage','month':'Dieser Monat','1month':'Letzte 30 Tage',
+                  '3months':'Letzte 3 Monate','year':'Dieses Jahr','all':'Gesamtzeitraum'};
+  document.getElementById('anaSubtitle').textContent = labels[period] || period;
+}
+
+function renderAllModules(data) {
+  if (_activeModuleIds.includes('bar'))      renderBarChart(data.series, 'bar');
+  if (_activeModuleIds.includes('balance'))  renderBalChart(data.series, 'line');
+  if (_activeModuleIds.includes('donut'))    renderDonutChart(data.category_data||[], 'doughnut');
+  if (_activeModuleIds.includes('incdonut')) renderIncDonut(data.income_category_data||[]);
+  if (_activeModuleIds.includes('cattable')) renderCatTable(data.category_data||[], _catView);
+  if (_activeModuleIds.includes('heatmap'))  renderHeatmap(data.series, data.mode);
+}
+
+// ── Stats ─────────────────────────────────────────────────────────────────────
+function renderStats(s) {
+  document.getElementById('anaStats').innerHTML = `
+    <div class="stat-card income-card"><span class="stat-icon">📥</span><div class="stat-body"><span class="stat-label">Einnahmen</span><span class="stat-value income-val">${s.total_income.toLocaleString('de-DE',{minimumFractionDigits:2})} €</span></div></div>
+    <div class="stat-card expense-card"><span class="stat-icon">📤</span><div class="stat-body"><span class="stat-label">Ausgaben</span><span class="stat-value expense-val">${s.total_expenses.toLocaleString('de-DE',{minimumFractionDigits:2})} €</span></div></div>
+    <div class="stat-card ${s.balance>=0?'balance-pos':'balance-neg'}"><span class="stat-icon">${s.balance>=0?'💰':'⚠️'}</span><div class="stat-body"><span class="stat-label">Bilanz</span><span class="stat-value ${s.balance>=0?'income-val':'expense-val'}">${s.balance.toLocaleString('de-DE',{minimumFractionDigits:2})} €</span></div></div>
+    <div class="stat-card savings-card"><span class="stat-icon">📈</span><div class="stat-body"><span class="stat-label">Sparquote</span><span class="stat-value ${s.savings_rate>=20?'income-val':'warning-val'}">${s.savings_rate}%</span></div></div>`;
+}
+
+// ── Chart type switchers ──────────────────────────────────────────────────────
+function switchBarType(type, btn) {
+  btn.closest('.chart-type-btns').querySelectorAll('.ct-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  if (_lastData) renderBarChart(_lastData.series, type);
+}
+function switchBalType(type, btn) {
+  btn.closest('.chart-type-btns').querySelectorAll('.ct-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  if (_lastData) renderBalChart(_lastData.series, type);
+}
+function switchDonutType(type, btn) {
+  btn.closest('.chart-type-btns').querySelectorAll('.ct-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  if (_lastData) renderDonutChart(_lastData.category_data||[], type);
+}
+function setCatView(view, btn) {
+  _catView = view;
+  btn.closest('.chart-type-btns').querySelectorAll('.ct-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  if (_lastData) renderCatTable(view==='income' ? (_lastData.income_category_data||[]) : (_lastData.category_data||[]), view);
+}
+
+// ── Charts ────────────────────────────────────────────────────────────────────
+function renderBarChart(series, type) {
+  const canvas = document.getElementById('barChart');
+  if (!canvas) return;
+  _charts.bar?.destroy();
+  const c = chartColors();
+  _charts.bar = new Chart(canvas.getContext('2d'), {
+    type,
+    data: { labels: series.map(m=>m.label), datasets: [
+      { label:'Einnahmen', data:series.map(m=>m.income),   backgroundColor:c.income+'55',  borderColor:c.income,  borderWidth:2, borderRadius:type==='bar'?8:0, fill:type==='line', tension:.4 },
+      { label:'Ausgaben',  data:series.map(m=>m.expenses), backgroundColor:c.expense+'55', borderColor:c.expense, borderWidth:2, borderRadius:type==='bar'?8:0, fill:type==='line', tension:.4 },
+    ]},
+    options:{ responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ position:'top', labels:{ usePointStyle:true, padding:16 }}},
+      scales:{ x:{grid:{color:c.border},ticks:{color:c.text2,maxRotation:45}}, y:{grid:{color:c.border},ticks:{color:c.text2,callback:v=>v+' €'}} }
+    }
+  });
+}
+
+function renderBalChart(series, type) {
+  const canvas = document.getElementById('balChart');
+  if (!canvas) return;
+  _charts.bal?.destroy();
+  const c = chartColors();
+  const vals = series.map(m=>m.balance);
+  const col  = (vals[vals.length-1]||0) >= 0 ? c.income : c.expense;
+  _charts.bal = new Chart(canvas.getContext('2d'), {
+    type,
+    data:{ labels:series.map(m=>m.label), datasets:[{
+      label:'Bilanz', data:vals, borderColor:col, backgroundColor:col+'22',
+      borderWidth:2.5, fill:true, tension:.4, borderRadius:type==='bar'?8:0, pointRadius:3
+    }]},
+    options:{ responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false} },
+      scales:{ x:{grid:{color:c.border},ticks:{color:c.text2,maxRotation:45}}, y:{grid:{color:c.border},ticks:{color:c.text2,callback:v=>v+' €'}} }
+    }
+  });
+}
+
+function renderDonutChart(cats, type) {
+  const canvas = document.getElementById('donutChart');
+  if (!canvas || !cats.length) return;
+  _charts.donut?.destroy();
+  _charts.donut = new Chart(canvas.getContext('2d'), {
+    type,
+    data:{ labels:cats.map(c=>c.emoji+' '+c.name), datasets:[{ data:cats.map(c=>c.amount), backgroundColor:cats.map(c=>c.color), borderWidth:0, hoverOffset:8 }]},
+    options:{ responsive:true, maintainAspectRatio:false, cutout:type==='doughnut'?'68%':'0%',
+      plugins:{ legend:{ position:'right', labels:{ usePointStyle:true, padding:10, boxWidth:10, font:{size:11} }}}
+    }
+  });
+}
+
+function renderIncDonut(cats) {
+  const canvas = document.getElementById('incDonutChart');
+  if (!canvas || !cats.length) return;
+  _charts.incDonut?.destroy();
+  _charts.incDonut = new Chart(canvas.getContext('2d'), {
+    type:'doughnut',
+    data:{ labels:cats.map(c=>c.emoji+' '+c.name), datasets:[{ data:cats.map(c=>c.amount), backgroundColor:cats.map(c=>c.color), borderWidth:0, hoverOffset:8 }]},
+    options:{ responsive:true, maintainAspectRatio:false, cutout:'68%',
+      plugins:{ legend:{ position:'right', labels:{ usePointStyle:true, padding:10, boxWidth:10, font:{size:11} }}}
+    }
+  });
+}
+
+function renderCatTable(cats) {
+  const el = document.getElementById('anaCatTable');
+  if (!el) return;
+  const max = cats[0]?.amount || 1;
+  el.innerHTML = cats.length
+    ? cats.map(c=>`
+      <div class="cat-row">
+        <span class="cat-emoji">${c.emoji}</span>
+        <span class="cat-name">${escHtml(c.name)}</span>
+        <div class="cat-bar-wrap"><div class="cat-bar" style="width:${c.amount/max*100}%;background:${c.color}"></div></div>
+        <span class="cat-pct">${c.percentage}%</span>
+        <span class="cat-amt">${c.amount.toLocaleString('de-DE',{minimumFractionDigits:2})} €</span>
+      </div>`).join('')
+    : '<div class="empty-state" style="padding:1.5rem"><span>📊</span><p>Keine Daten</p></div>';
+}
+
+function renderHeatmap(series, mode) {
+  const wrap = document.getElementById('heatmapWrap');
+  const sub  = document.getElementById('heatmapSub');
+  if (!wrap) return;
+  if (sub) sub.textContent = mode==='daily' ? 'Tagesgenaue Ansicht' : 'Monatliche Ansicht';
+  if (!series.length) { wrap.innerHTML=''; return; }
+  const max = Math.max(...series.map(m=>m.expenses),1);
+  wrap.innerHTML = `<div class="heatmap-bars">${series.map(m=>{
+    const h   = Math.max(Math.round(m.expenses/max*90),2);
+    const col = m.balance>=0 ? 'var(--income)' : 'var(--expense)';
+    return `<div class="hm-col" title="${m.label}\nAusgaben: ${m.expenses.toLocaleString('de-DE',{minimumFractionDigits:2})} €\nEinnahmen: ${m.income.toLocaleString('de-DE',{minimumFractionDigits:2})} €">
+      <div class="hm-bar" style="height:${h}px;background:${col}40;border-top:2px solid ${col}"></div>
+      <div class="hm-label">${m.label}</div>
+    </div>`;
+  }).join('')}</div>`;
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  buildModuleGrid();
+  loadPeriod('month', document.querySelector('.period-btn.active'));
+});
+</script>
+{% endblock %}

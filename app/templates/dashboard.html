@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+{% block title %}Dashboard – Vault{% endblock %}
+
+{% block content %}
+{% set cfg = cfg %}
+
+<div class="page-header">
+  <div>
+    <h1 class="page-title">👋 Übersicht</h1>
+    <p class="page-sub">{{ month_name }}{% if auto_created > 0 %} &nbsp;·&nbsp; <span style="color:var(--accent)">{{ auto_created }} wiederkehrend eingetragen</span>{% endif %}</p>
+  </div>
+  <div class="btn-group">
+    <button class="btn-ghost"    onclick="openAddTx('income')">📥 Einnahme</button>
+    <button class="btn-primary"  onclick="openAddTx('expense')">📤 Ausgabe</button>
+  </div>
+</div>
+
+<!-- Stat Cards -->
+<div class="stats-grid">
+  <div class="stat-card income-card">
+    <span class="stat-icon">📥</span>
+    <div class="stat-body">
+      <span class="stat-label">Einnahmen</span>
+      <span class="stat-value income-val">{{ '%.2f'|format(income) }} {{ cfg.currency or '€' }}</span>
+    </div>
+  </div>
+  <div class="stat-card expense-card">
+    <span class="stat-icon">📤</span>
+    <div class="stat-body">
+      <span class="stat-label">Ausgaben</span>
+      <span class="stat-value expense-val">{{ '%.2f'|format(expenses) }} {{ cfg.currency or '€' }}</span>
+    </div>
+  </div>
+  <div class="stat-card {{ 'balance-pos' if balance >= 0 else 'balance-neg' }}">
+    <span class="stat-icon">{{ '💰' if balance >= 0 else '⚠️' }}</span>
+    <div class="stat-body">
+      <span class="stat-label">Bilanz (Monat)</span>
+      <span class="stat-value {{ 'income-val' if balance >= 0 else 'expense-val' }}">{{ '%.2f'|format(balance) }} {{ cfg.currency or '€' }}</span>
+    </div>
+  </div>
+  <div class="stat-card savings-card">
+    <span class="stat-icon">📈</span>
+    <div class="stat-body">
+      <span class="stat-label">Sparquote</span>
+      <span class="stat-value {{ 'income-val' if savings_rate >= 20 else ('warning-val' if savings_rate >= 0 else 'expense-val') }}">{{ savings_rate }}%</span>
+    </div>
+  </div>
+</div>
+
+<div class="dash-grid">
+  <div class="card">
+    <div class="card-header">
+      <h3>Monatsverlauf</h3>
+      <span class="card-sub">{{ month_name }}</span>
+    </div>
+    <div style="height:240px;position:relative">
+      <canvas id="dashChart"></canvas>
+    </div>
+  </div>
+
+  <!-- Budget Warnings -->
+  <div class="card">
+    <div class="card-header">
+      <h3>Budget-Status</h3>
+      <a class="link-more" href="/budget">Details →</a>
+    </div>
+    {% if warnings %}
+    <div class="warnings-list">
+      {% for w in warnings[:5] %}
+      <div class="warning-item {{ w.status }}">
+        <span class="w-emoji">{{ w.emoji }}</span>
+        <div class="w-info">
+          <span class="w-name">{{ w.category }}</span>
+          <div class="w-bar-wrap">
+            <div class="w-bar" style="width:{{ [w.pct,100]|min }}%;background:{{ w.color }}"></div>
+          </div>
+        </div>
+        <div class="w-nums">
+          <span class="w-pct {{ w.status }}">{{ w.pct }}%</span>
+          <span class="w-detail">{{ '%.0f'|format(w.spent) }} / {{ '%.0f'|format(w.limit) }} €</span>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state" style="padding:1.5rem">
+      <span>✅</span>
+      <p>Alle Budgets im grünen Bereich!</p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Recent Transactions -->
+<div class="card">
+  <div class="card-header">
+    <h3>Letzte Transaktionen</h3>
+    <a class="link-more" href="/transactions">Alle →</a>
+  </div>
+  {% if recent %}
+  <div class="tx-list">
+    {% for t in recent %}
+    <div class="tx-item">
+      <div class="tx-icon" style="background:{{ t.category.color if t.category else '#666' }}22">
+        {% if t.image_path %}
+          <img class="tx-img-tiny" src="{{ t.image_path }}" alt="">
+        {% else %}
+          {{ t.emoji or (t.category.emoji if t.category else '📁') }}
+        {% endif %}
+      </div>
+      <div class="tx-info">
+        <span class="tx-desc">{{ t._clean_desc() }}</span>
+        <span class="tx-meta">
+          <span>{{ t.date.strftime('%d.%m.%Y') }}</span>
+          {% if t.category %}
+          <span class="cat-badge" style="background:{{ t.category.color }}22;color:{{ t.category.color }}">{{ t.category.emoji }} {{ t.category.name }}</span>
+          {% endif %}
+          {% if t.note %}<span class="note-badge" title="{{ t.note }}">📝</span>{% endif %}
+        </span>
+      </div>
+      <span class="tx-amount {{ t.type }}">
+        {{ '+' if t.type == 'income' else '-' }}{{ '%.2f'|format(t.amount) }} {{ cfg.currency or '€' }}
+      </span>
+      <div class="tx-actions">
+        <button class="icon-btn-sm" onclick="openEditTx({{ t.id }})">✏️</button>
+        <button class="icon-btn-sm danger" onclick="deleteTx({{ t.id }})">🗑️</button>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <span>💳</span>
+    <p>Noch keine Transaktionen.<br>Füge deine erste Transaktion hinzu!</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+  const resp = await fetch('/api/analytics?period=month');
+  const data = await resp.json();
+  const ctx  = document.getElementById('dashChart')?.getContext('2d');
+  if (ctx && data.series?.length) {
+    makeBarChart(
+      ctx,
+      data.series.map(m => m.label),
+      data.series.map(m => m.income),
+      data.series.map(m => m.expenses)
+    );
+  }
+});
+</script>
+{% endblock %}

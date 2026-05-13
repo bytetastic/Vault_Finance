@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+{% block title %}Budget – Vault{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Budget</h1>
+    <p class="page-sub">{{ month_name }}</p>
+  </div>
+  <div class="btn-group">
+    <button class="btn-ghost"   onclick="openBudgetEdit()">⚙️ Limits bearbeiten</button>
+    <button class="btn-primary" onclick="openAddCat()">＋ Kategorie</button>
+  </div>
+</div>
+
+{% if budget_data %}
+<div class="budget-overview">
+  <div class="budget-overview-inner">
+    <div>
+      <span class="stat-label">Gesamt Budget</span>
+      <span class="stat-value">{{ '%.2f'|format(total_budget) }} €</span>
+    </div>
+    <div>
+      <span class="stat-label">Ausgegeben</span>
+      <span class="stat-value expense-val">{{ '%.2f'|format(total_spent) }} €</span>
+    </div>
+    <div>
+      <span class="stat-label">Verbleibend</span>
+      <span class="stat-value {{ 'expense-val' if total_spent > total_budget else 'income-val' }}">{{ '%.2f'|format(total_budget - total_spent) }} €</span>
+    </div>
+    <div>
+      {% set op = (total_spent / total_budget * 100) if total_budget > 0 else 0 %}
+      <span class="stat-label">Verbraucht</span>
+      <span class="stat-value {{ 'danger-val' if total_spent > total_budget else ('warning-val' if op >= 90 else '') }}">{{ '%.1f'|format(op) }}%</span>
+    </div>
+  </div>
+  {% set op = [(total_spent / total_budget * 100) if total_budget > 0 else 0, 100]|min %}
+  {% set ov_status = 'over' if total_spent > total_budget else ('danger' if op >= 90 else ('warning' if op >= 75 else 'ok')) %}
+  <div class="overall-bar-wrap">
+    <div class="overall-bar {{ ov_status }}" style="width:{{ op }}%"></div>
+  </div>
+  <p style="font-size:.75rem;color:var(--text-3);margin-top:.6rem">
+    💡 Budget-Monat: Zahlungen können einem anderen Monat zugeordnet werden (z.B. Miete am 29. → nächster Monat). Beim Bearbeiten einer Transaktion das Feld „Budget-Monat" nutzen.
+  </p>
+</div>
+
+<div class="budget-grid">
+  {% for b in budget_data %}
+  <div class="budget-card {{ b.status }}" id="bcard-{{ b.category.id }}">
+    <div class="budget-card-header">
+      <div class="budget-cat-info">
+        <span class="budget-emoji">{{ b.category.emoji }}</span>
+        <span class="budget-cat-name">{{ b.category.name }}</span>
+      </div>
+      <div style="display:flex;gap:.4rem;align-items:center">
+        <span class="budget-status-badge {{ b.status }}">
+          {% if b.status == 'over' %}🔴 -{{ '%.2f'|format(b.spent - b.category.budget_limit) }} €
+          {% elif b.status == 'full' %}🟡 Genau voll
+          {% elif b.status == 'danger' %}🟠 Kritisch
+          {% elif b.status == 'warning' %}🟡 Warnung
+          {% else %}🟢 OK{% endif %}
+        </span>
+        <button class="icon-btn-sm danger" title="Kategorie löschen"
+          onclick="confirmDeleteCat({{ b.category.id }}, '{{ b.category.name|e }}')">🗑️</button>
+      </div>
+    </div>
+    <div class="budget-progress-wrap">
+      <div class="budget-progress-bar {{ b.status }}"
+           style="width:{{ [b.pct,100]|min }}%;background:{{ b.category.color }}"></div>
+    </div>
+    <div class="budget-footer">
+      <span class="budget-spent">{{ '%.2f'|format(b.spent) }} € ausgegeben</span>
+      <span class="budget-pct {{ b.status }}">{{ b.pct }}%</span>
+      <span class="budget-limit">von {{ '%.2f'|format(b.category.budget_limit) }} €</span>
+    </div>
+    <div class="budget-remaining {{ b.status }}">
+      {% if b.status == 'over' %}⚠️ {{ '%.2f'|format(b.spent - b.category.budget_limit) }} € überschritten
+      {% elif b.status == 'full' %}✅ Budget genau aufgebraucht
+      {% else %}{{ '%.2f'|format(b.remaining) }} € verbleibend{% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card">
+  <div class="empty-state">
+    <span>💰</span>
+    <p>Noch keine Budgets eingestellt.<br>Klicke auf „Limits bearbeiten" um Kategorie-Budgets festzulegen.</p>
+    <button class="btn-primary" onclick="openBudgetEdit()">⚙️ Limits bearbeiten</button>
+  </div>
+</div>
+{% endif %}
+
+<!-- Budget Edit Modal -->
+<div class="modal modal-lg" id="budgetEditModal">
+  <div class="modal-header">
+    <h2 class="modal-title">Budget-Limits bearbeiten</h2>
+    <button class="modal-close" onclick="closeModal()">✕</button>
+  </div>
+  <p style="color:var(--text-2);margin-bottom:.5rem;font-size:.85rem">
+    Monatliches Limit pro Kategorie. <strong>0 = kein Limit</strong> (erscheint nicht im Budget-Grid).
+  </p>
+  <p style="color:var(--text-3);margin-bottom:1.25rem;font-size:.78rem">
+    Hier sind alle Ausgabe-Kategorien aufgelistet — auch neu hinzugefügte.
+  </p>
+  <div id="budgetEditList"></div>
+  <div class="modal-actions">
+    <button class="btn-ghost" onclick="closeModal()">Abbrechen</button>
+    <button class="btn-primary" onclick="saveBudgets()">💾 Speichern</button>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const CATEGORIES = {{ categories | tojson }};
+
+function openBudgetEdit() {
+  document.getElementById('budgetEditList').innerHTML = CATEGORIES.map(c => `
+    <div class="budget-edit-row" id="ber-${c.id}">
+      <span style="font-size:1.3rem">${c.emoji}</span>
+      <span style="flex:1;font-weight:600">${escHtml(c.name)}</span>
+      <input type="number" class="budget-input" data-cat-id="${c.id}"
+             value="${c.budget_limit||0}" min="0" step="0.01" placeholder="0">
+      <span style="color:var(--text-3);font-size:.82rem">€/Mo.</span>
+      <button class="icon-btn-sm danger" title="Kategorie löschen"
+              onclick="deleteCatFromModal(${c.id}, '${escHtml(c.name)}')">🗑️</button>
+    </div>`).join('');
+  openModal('budgetEditModal');
+}
+
+async function deleteCatFromModal(id, name) {
+  showConfirm(`Kategorie "${name}" löschen?`, async () => {
+    const r = await (await fetch(`/api/categories/${id}`, { method:'DELETE' })).json();
+    if (r.success) {
+      document.getElementById(`ber-${id}`)?.remove();
+      showToast('Gelöscht', 'success');
+    } else {
+      showToast(r.error || 'Fehler', 'error');
+    }
+  });
+}
+
+async function saveBudgets() {
+  const inputs = document.querySelectorAll('.budget-input');
+  await Promise.all(Array.from(inputs).map(inp =>
+    fetch(`/api/categories/${inp.dataset.catId}`, {
+      method:'PUT', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ budget_limit: parseFloat(inp.value) || 0 })
+    })
+  ));
+  showToast('Budgets gespeichert!', 'success');
+  setTimeout(() => location.reload(), 800);
+}
+
+function confirmDeleteCat(id, name) {
+  showConfirm(`Kategorie "${name}" wirklich löschen?`, async () => {
+    const r = await (await fetch(`/api/categories/${id}`, { method: 'DELETE' })).json();
+    if (r.success) { showToast('Gelöscht', 'success'); setTimeout(() => location.reload(), 700); }
+    else showToast(r.error || 'Fehler', 'error');
+  });
+}
+</script>
+{% endblock %}
