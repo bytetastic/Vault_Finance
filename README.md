@@ -34,15 +34,15 @@ financetracker/
 ├── README.md
 ├── .gitignore
 │
-├── data/                         ← SQLite-Datenbank (wird auto. erstellt, nicht committen!)
+├── data/                         
 │   └── finance.db
 │
 └── app/
-    ├── __init__.py               ← App-Factory & Default-Daten
-    ├── models.py                 ← Datenbank-Modelle
-    ├── routes.py                 ← Alle Routen & API-Endpunkte
+    ├── __init__.py              
+    ├── models.py                
+    ├── routes.py                
     ├── templates/
-    │   ├── base.html             ← Layout (Sidebar, Modals)
+    │   ├── base.html            
     │   ├── dashboard.html
     │   ├── transactions.html
     │   ├── analytics.html
@@ -51,7 +51,7 @@ financetracker/
     └── static/
         ├── css/style.css
         ├── js/app.js
-        └── uploads/              ← Hochgeladene Bilder/Sticker
+        └── uploads/            
 ```
 
 ---
