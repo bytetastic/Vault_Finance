@@ -97,11 +97,11 @@ http://localhost:8844
 
 ### Verbindung via FileZilla (SFTP)
 
-| Feld | Wert |
-|---|---|
-| Host | `sftp://192.168.178.10` |
-| Benutzername | `raspi` |
-| Port | `22` |
+| Feld | Wert             |
+|---|------------------|
+| Host | `sftp://DEINEIP` |
+| Benutzername | `DEINBENUTZER`   |
+| Port | `22`             |
 
 ### Was übertragen?
 
@@ -117,14 +117,14 @@ http://localhost:8844
 ### Docker starten (SSH)
 
 ```bash
-ssh raspi@192.168.178.10
+ssh DEINBENUTZER@DEINEIP
 cd /home/raspi/financetracker
 docker compose up -d --build
 ```
 
 **App aufrufen:**
 ```
-http://192.168.178.10:8844
+http://DEINEIP:8844
 ```
 
 ---
