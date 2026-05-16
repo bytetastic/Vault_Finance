@@ -1,75 +1,86 @@
-# ───────────────────────────────
-# Python
-# ───────────────────────────────
-__pycache__/
-*.py[cod]
-*.pyo
-*.pyd
-*.egg-info/
-dist/
-build/
-.eggs/
+# ═══════════════════════════════════════════════════════
+#  Finance Vault — .gitignore
+#  WICHTIG: Niemals persönliche Finanzdaten committen!
+# ═══════════════════════════════════════════════════════
 
-# Virtual Environment
-venv/
-.venv/
-env/
-ENV/
+# ── Persönliche Daten (NIEMALS teilen!) ─────────────────
+data/finance.db
+data/finance.db-wal
+data/finance.db-shm
+data/*.db
+data/*.db-*
+data/documents/
+!data/.gitkeep
+!data/documents/.gitkeep
 
-# ───────────────────────────────
-# Datenbank (niemals teilen!)
-# ───────────────────────────────
-*.db
-*.sqlite
-*.sqlite3
-data/
-
-# ───────────────────────────────
-# Flask
-# ───────────────────────────────
-instance/
-.flask_session/
-
-# ───────────────────────────────
-# Uploads (Bilder/Sticker)
-# ───────────────────────────────
+# Hochgeladene Belege & Bilder
 app/static/uploads/*
 !app/static/uploads/.gitkeep
 
-# ───────────────────────────────
-# Umgebungsvariablen
-# ───────────────────────────────
+# ── Python ───────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Virtual Environments
+venv/
+env/
+.venv/
+.env/
+ENV/
+env.bak/
+venv.bak/
+
+# ── Build / Distribution ─────────────────────────────────
+build/
+dist/
+*.egg-info/
+*.egg
+*.spec
+!vault_finance.spec
+MANIFEST
+
+# PyInstaller Output
+dist/
+build/
+*.exe
+!release/*.exe
+
+# ── Umgebungsvariablen (Secrets!) ────────────────────────
 .env
+.env.local
+.env.production
 .env.*
-*.env
+!.env.example
 
-# ───────────────────────────────
-# PyCharm / JetBrains
-# ───────────────────────────────
+# ── IDE & Editor ─────────────────────────────────────────
+.vscode/
 .idea/
-*.iml
-*.iws
-*.ipr
-out/
-
-# ───────────────────────────────
-# Betriebssystem
-# ───────────────────────────────
-# Windows
-Thumbs.db
-ehthumbs.db
-Desktop.ini
-$RECYCLE.BIN/
-
-# macOS
-.DS_Store
-.AppleDouble
-.LSOverride
-
-# ───────────────────────────────
-# Logs & temporäre Dateien
-# ───────────────────────────────
-*.log
-*.tmp
-*.bak
 *.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── Logs ─────────────────────────────────────────────────
+*.log
+logs/
+flask.log
+
+# ── Test & Coverage ──────────────────────────────────────
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# ── Sonstiges ────────────────────────────────────────────
+*.bak
+*.tmp
+*.temp
+instance/
+.webassets-cache
