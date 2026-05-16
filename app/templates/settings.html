@@ -1,0 +1,391 @@
+{% extends "base.html" %}
+{% block title %}Einstellungen – Finance Vault{% endblock %}
+{% block content %}
+
+<div class="v2-hero">
+  <div class="v2-hero-inner">
+    <div>
+      <div class="v2-eyebrow">Konto & Konfiguration</div>
+      <h1 class="v2-title">Einstellungen.</h1>
+      <p class="v2-sub">Allgemein, Sicherheit, Kategorien und wiederkehrende Buchungen</p>
+    </div>
+  </div>
+</div>
+
+<div class="v2-body">
+  <div class="v2-grid v2-stagger">
+
+    <!-- Allgemein -->
+    <div class="v2-card">
+      <div class="v2-card-head"><h3>Allgemein</h3></div>
+      <div class="v2-setting-row">
+        <div class="v2-setting-info"><span class="v2-setting-name">Währungssymbol</span><span class="v2-setting-desc">z.B. €, $, CHF</span></div>
+        <input type="text" id="setCurrency" value="{{ cfg.currency or '€' }}" maxlength="5" class="v2-input" style="width:70px;text-align:center">
+      </div>
+      <div class="v2-setting-row">
+        <div class="v2-setting-info"><span class="v2-setting-name">Währungsposition</span></div>
+        <div class="v2-select-wrap">
+          <select id="setCurrencyPos">
+            <option value="after"  {% if cfg.currency_position != 'before' %}selected{% endif %}>Nach Betrag (1234 €)</option>
+            <option value="before" {% if cfg.currency_position == 'before' %}selected{% endif %}>Vor Betrag (€1234)</option>
+          </select>
+        </div>
+      </div>
+      <div class="v2-setting-row">
+        <div class="v2-setting-info"><span class="v2-setting-name">Monatliches Sparziel</span><span class="v2-setting-desc">0 = kein Ziel</span></div>
+        <input type="number" id="setSavingsGoal" value="{{ cfg.monthly_savings_goal or '0' }}" min="0" step="0.01" class="v2-input" style="width:120px">
+      </div>
+      <div style="margin-top:20px">
+        <button class="btn-primary" onclick="saveGeneralSettings()">Speichern</button>
+      </div>
+    </div>
+
+    <!-- Erscheinungsbild -->
+    <div class="v2-card">
+      <div class="v2-card-head"><h3>Erscheinungsbild</h3></div>
+      <div class="v2-setting-row">
+        <div class="v2-setting-info"><span class="v2-setting-name">Theme</span></div>
+        <div style="display:flex;gap:8px">
+          <button class="tab-btn" id="themeOptDark"  onclick="setTheme('dark')">Dark</button>
+          <button class="tab-btn" id="themeOptLight" onclick="setTheme('light')">Light</button>
+        </div>
+      </div>
+      <div class="v2-setting-row">
+        <div class="v2-setting-info"><span class="v2-setting-name">Warnung ab</span><span class="v2-setting-desc">Gelbe Warnung beim Budget</span></div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <input type="range" id="setWarnTh" min="50" max="99" step="1" value="{{ cfg.warning_threshold or '75' }}" oninput="updateThresholdLabels()">
+          <span id="warnThVal" style="font-size:13px;font-weight:600;min-width:36px">{{ cfg.warning_threshold or '75' }}%</span>
+        </div>
+      </div>
+      <div class="v2-setting-row">
+        <div class="v2-setting-info"><span class="v2-setting-name">Kritisch ab</span><span class="v2-setting-desc">Rote Warnung beim Budget</span></div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <input type="range" id="setDangTh" min="50" max="99" step="1" value="{{ cfg.danger_threshold or '90' }}" oninput="updateThresholdLabels()">
+          <span id="dangThVal" style="font-size:13px;font-weight:600;min-width:36px">{{ cfg.danger_threshold or '90' }}%</span>
+        </div>
+      </div>
+      <div style="margin-top:20px">
+        <button class="btn-primary" onclick="saveWarningSettings()">Speichern</button>
+      </div>
+    </div>
+
+    <!-- Konto & Sicherheit (full width) -->
+    </div><!-- closes v2-grid -->
+    
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:20px">
+
+    <!-- Benutzerkonto -->
+    <div class="v2-card">
+      <div class="v2-card-head">
+        <h3>Benutzerkonto</h3>
+        <span class="sub" id="currentUserDisplay">{{ current_user.username }}</span>
+      </div>
+      <div class="v2-setting-row">
+        <div class="v2-setting-info">
+          <span class="v2-setting-name">Benutzername</span>
+          <span class="v2-setting-desc">Anzeigename beim Login</span>
+        </div>
+        <input type="text" id="newUsername" placeholder="{{ current_user.username }}" class="v2-input" style="width:180px" maxlength="50">
+      </div>
+      <div style="margin-top:16px">
+        <button class="btn-primary" onclick="changeUsername()">Benutzername ändern</button>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="v2-setting-row" style="margin-top:0">
+        <div class="v2-setting-info">
+          <span class="v2-setting-name">Neues Passwort</span>
+          <span class="v2-setting-desc">Mindestens 8 Zeichen</span>
+        </div>
+        <input type="password" id="newPw" placeholder="Neues Passwort" class="v2-input" style="width:180px" autocomplete="new-password">
+      </div>
+      <div class="v2-setting-row">
+        <div class="v2-setting-info"><span class="v2-setting-name">Bestätigen</span></div>
+        <input type="password" id="newPw2" placeholder="Wiederholen" class="v2-input" style="width:180px" autocomplete="new-password">
+      </div>
+      <div style="margin-top:16px">
+        <button class="btn-primary" onclick="changePassword()">Passwort ändern</button>
+      </div>
+    </div>
+
+    <!-- Session & Sitzung -->
+    <div class="v2-card">
+      <div class="v2-card-head">
+        <h3>Sitzung &amp; Sicherheit</h3>
+      </div>
+      <div class="v2-setting-row">
+        <div class="v2-setting-info">
+          <span class="v2-setting-name">Automatisch abmelden</span>
+          <span class="v2-setting-desc">Nach Inaktivität erneut einloggen</span>
+        </div>
+        <div class="v2-select-wrap">
+          <select id="sessionTimeout" onchange="saveSessionTimeout()">
+            <option value="0">Browser-Sitzung (beim Schließen)</option>
+            <option value="1">Nach 1 Tag</option>
+            <option value="3">Nach 3 Tagen</option>
+            <option value="7">Nach 1 Woche</option>
+            <option value="14">Nach 2 Wochen</option>
+            <option value="30" selected>Nach 30 Tagen</option>
+            <option value="90">Nach 3 Monaten</option>
+            <option value="365">Nach 1 Jahr</option>
+            <option value="9999">Nie abmelden</option>
+          </select>
+        </div>
+      </div>
+
+      <div style="margin-top:20px;padding:14px 16px;background:rgba(179,38,30,0.06);border:1px solid rgba(179,38,30,0.15);border-radius:var(--vault-r-sm)">
+        <div style="font-size:13px;font-weight:600;color:var(--finance-negative);margin-bottom:8px">Alle Sitzungen beenden</div>
+        <div style="font-size:12px;color:var(--vault-ink-muted-48);margin-bottom:12px">Meldet alle aktiven Browser-Sitzungen ab. Du wirst danach sofort ausgeloggt.</div>
+        <button class="btn-danger" style="height:32px;font-size:12px;padding:0 14px" onclick="confirmLogoutAll()">Jetzt abmelden</button>
+      </div>
+
+      <div style="margin-top:16px;padding:14px 16px;background:var(--vault-canvas-parchment);border-radius:var(--vault-r-sm)">
+        <div style="font-size:12px;font-weight:600;color:var(--vault-ink-muted-48);margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em">Aktuelle Sitzung</div>
+        <div style="font-size:13px;color:var(--vault-ink)">Angemeldet als <strong id="sessionUser">{{ current_user.username }}</strong></div>
+        <div style="font-size:12px;color:var(--vault-ink-muted-48);margin-top:3px">Browser: {{ request.user_agent.browser|default('Unbekannt')|capitalize }}</div>
+      </div>
+    </div>
+
+    </div><!-- closes inner 2-col grid -->
+
+    <!-- Back to v2-grid would restart here if needed, but sections below are full-width -->
+    <div style="display:none"><!-- dummy to balance template logic -->
+
+    <!-- Export -->
+    <div class="v2-card">
+      <div class="v2-card-head"><h3>Daten exportieren</h3></div>
+      <p style="font-size:13px;color:var(--vault-ink-muted-48);margin:0 0 20px">Exportiere alle Transaktionen als CSV oder JSON.</p>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <a href="/api/export?format=csv"  class="btn-ghost">CSV herunterladen</a>
+        <a href="/api/export?format=json" class="btn-ghost">JSON herunterladen</a>
+      </div>
+    </div>
+  </div>
+
+  </div><!-- close dummy -->
+
+  <!-- Quick Entries -->
+  <div class="v2-card" style="margin-top:20px">
+    <div class="v2-card-head">
+      <h3>Schnelleingaben</h3>
+      <button class="btn-primary btn-sm" onclick="openAddQE()">+ Hinzufügen</button>
+    </div>
+    <div id="qeList">
+      {% if quick_entries %}
+        {% for q in quick_entries %}
+        <div class="quick-entry-item">
+          <span style="font-size:20px;width:28px;text-align:center">{{ q.emoji or '⚡' }}</span>
+          <div style="flex:1">
+            <div style="font-size:13px;font-weight:600">{{ q.name }}</div>
+            <div style="font-size:11px;color:var(--vault-ink-muted-48)">{{ '%.2f'|format(q.amount) }} {{ cfg.currency or '€' }} · {{ 'Ausgabe' if q.type == 'expense' else 'Einnahme' }}</div>
+          </div>
+          <div class="tx-actions">
+            <button class="icon-btn" onclick="openEditQE({{ q.id }})">✏️</button>
+            <button class="icon-btn danger" onclick="deleteQE({{ q.id }})">🗑️</button>
+          </div>
+        </div>
+        {% endfor %}
+      {% else %}
+        <p class="muted" style="font-size:13px">Noch keine Schnelleingaben angelegt.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Wiederkehrende -->
+  <div class="v2-card" style="margin-top:20px">
+    <div class="v2-card-head">
+      <h3>Wiederkehrende Buchungen</h3>
+      <button class="btn-primary btn-sm" onclick="openAddRecurring()">+ Hinzufügen</button>
+    </div>
+    {% if recurring %}
+      {% for r in recurring %}
+      <div class="rec-item">
+        <span style="font-size:20px;width:28px;text-align:center">{{ r.emoji or '🔄' }}</span>
+        <div class="rec-info">
+          <div class="rec-name">{{ r.name }}</div>
+          <div class="rec-meta">{{ r.frequency_display }} · ab {{ r.start_date.strftime('%d.%m.%Y') }}{% if r.end_date %} bis {{ r.end_date.strftime('%d.%m.%Y') }}{% endif %}</div>
+        </div>
+        <span class="rec-amount {{ r.type }}">{{ '%.2f'|format(r.amount) }} {{ cfg.currency or '€' }}</span>
+        <div class="rec-actions">
+          <button class="icon-btn" onclick="openEditRecurring({{ r.id }})">✏️</button>
+          <button class="icon-btn danger" onclick="confirmDeleteRecurring({{ r.id }}, '{{ r.name|e }}')">🗑️</button>
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <p class="muted" style="font-size:13px">Noch keine wiederkehrenden Buchungen.</p>
+    {% endif %}
+  </div>
+
+  <!-- Kategorien -->
+  <div class="v2-card" style="margin-top:20px">
+    <div class="v2-card-head">
+      <h3>Kategorien</h3>
+      <button class="btn-primary btn-sm" onclick="openAddCat()">+ Kategorie</button>
+    </div>
+    <div style="display:flex;gap:6px;margin-bottom:16px">
+      <button class="tab-btn active" onclick="filterCatList(this,'')">Alle</button>
+      <button class="tab-btn" onclick="filterCatList(this,'expense')">Ausgaben</button>
+      <button class="tab-btn" onclick="filterCatList(this,'income')">Einnahmen</button>
+    </div>
+    <div class="categories-list" id="catList">
+      {% for c in categories %}
+      <div class="cat-item" data-type="{{ c.type }}">
+        <span class="cat-item-icon">{{ c.emoji }}</span>
+        <div class="cat-item-color" style="background:{{ c.color }}"></div>
+        <div class="cat-item-info">
+          <div class="cat-item-name">{{ c.name }}</div>
+          <div class="cat-item-meta">
+            <span class="cat-type-badge {{ c.type }}">{{ 'Ausgabe' if c.type == 'expense' else ('Einnahme' if c.type == 'income' else 'Beides') }}</span>
+            {% if c.budget_limit %}<span class="cat-budget-badge">Limit: {{ '%.0f'|format(c.budget_limit) }} {{ cfg.currency or '€' }}</span>{% endif %}
+          </div>
+        </div>
+        <div class="cat-item-actions">
+          <button class="icon-btn" onclick="openEditCat({{ c.id }},'{{ c.name|e }}','{{ c.emoji|e }}','{{ c.color }}','{{ c.type }}',{{ c.budget_limit or 0 }},'{{ c.income_type }}')">✏️</button>
+          <button class="icon-btn danger" onclick="confirmDeleteCat({{ c.id }},'{{ c.name|e }}')">🗑️</button>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Theme buttons state
+(function(){
+  const t = document.documentElement.getAttribute('data-theme') || 'dark';
+  document.getElementById('themeOptDark')?.classList.toggle('active', t === 'dark');
+  document.getElementById('themeOptLight')?.classList.toggle('active', t === 'light');
+})();
+
+function setTheme(t) {
+  document.documentElement.setAttribute('data-theme', t);
+  localStorage.setItem('theme', t);
+  updateThemeIcon(t);
+  fetch('/api/settings', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({theme:t})});
+  document.getElementById('themeOptDark')?.classList.toggle('active', t === 'dark');
+  document.getElementById('themeOptLight')?.classList.toggle('active', t === 'light');
+}
+
+function updateThresholdLabels() {
+  const w = document.getElementById('setWarnTh');
+  const d = document.getElementById('setDangTh');
+  if (w) document.getElementById('warnThVal').textContent = w.value + '%';
+  if (d) document.getElementById('dangThVal').textContent = d.value + '%';
+}
+
+async function saveGeneralSettings() {
+  const r = await fetch('/api/settings', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      currency: document.getElementById('setCurrency').value,
+      currency_position: document.getElementById('setCurrencyPos').value,
+      monthly_savings_goal: parseFloat(document.getElementById('setSavingsGoal').value) || 0
+    })
+  });
+  const d = await r.json();
+  showToast(d.success ? 'Einstellungen gespeichert' : (d.error||'Fehler'), d.success ? 'success' : 'error');
+}
+
+async function saveWarningSettings() {
+  const r = await fetch('/api/settings', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      warning_threshold: parseInt(document.getElementById('setWarnTh').value),
+      danger_threshold: parseInt(document.getElementById('setDangTh').value),
+    })
+  });
+  const d = await r.json();
+  showToast(d.success ? 'Schwellenwerte gespeichert' : (d.error||'Fehler'), d.success ? 'success' : 'error');
+}
+
+async function changeUsername() {
+  const name = document.getElementById('newUsername').value.trim();
+  if (!name) return showToast('Bitte Benutzernamen eingeben', 'warning');
+  const r = await fetch('/api/settings', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:name})});
+  const d = await r.json();
+  if (d.success) {
+    showToast('Benutzername geändert zu: ' + (d.username||name), 'success');
+    document.getElementById('currentUserDisplay').textContent = d.username || name;
+    document.getElementById('sessionUser').textContent = d.username || name;
+    document.getElementById('newUsername').value = '';
+    document.getElementById('newUsername').placeholder = d.username || name;
+  } else {
+    showToast(d.error || 'Fehler beim Ändern', 'error');
+  }
+}
+
+async function changePassword() {
+  const pw  = document.getElementById('newPw').value;
+  const pw2 = document.getElementById('newPw2').value;
+  if (!pw) return showToast('Passwort eingeben', 'warning');
+  if (pw.length < 8) return showToast('Mindestens 8 Zeichen erforderlich', 'warning');
+  if (pw !== pw2) return showToast('Passwörter stimmen nicht überein', 'error');
+  const r = await fetch('/api/settings', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:pw})});
+  const d = await r.json();
+  showToast(d.success ? 'Passwort erfolgreich geändert' : (d.error||'Fehler'), d.success ? 'success' : 'error');
+  if (d.success) { document.getElementById('newPw').value=''; document.getElementById('newPw2').value=''; }
+}
+
+async function saveSessionTimeout() {
+  const val = document.getElementById('sessionTimeout').value;
+  const r = await fetch('/api/settings', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({session_timeout:parseInt(val)})});
+  const d = await r.json();
+  const labels = {'0':'Browser-Sitzung','1':'1 Tag','3':'3 Tage','7':'1 Woche','14':'2 Wochen','30':'30 Tage','90':'3 Monate','365':'1 Jahr','9999':'Nie'};
+  if (d.success) showToast(`Sitzungsdauer: ${labels[val]||val+' Tage'}`, 'success');
+  else showToast(d.error||'Fehler', 'error');
+}
+
+function confirmLogoutAll() {
+  showConfirm('Alle Sitzungen beenden? Du wirst sofort ausgeloggt.', () => {
+    window.location.href = '/logout';
+  });
+}
+
+// Load current session timeout setting
+document.addEventListener('DOMContentLoaded', async () => {
+  try {
+    const r = await fetch('/api/security');
+    const d = await r.json();
+    const sel = document.getElementById('sessionTimeout');
+    if (sel && d.session_timeout !== undefined) {
+      const timeout = String(d.session_timeout);
+      // Find closest option
+      const opt = [...sel.options].find(o => o.value === timeout);
+      if (opt) sel.value = timeout;
+    }
+  } catch(e) {}
+});
+
+function filterCatList(btn, type) {
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('.cat-item').forEach(item => {
+    item.style.display = (!type || item.dataset.type === type || item.dataset.type === 'both') ? '' : 'none';
+  });
+}
+
+// Load quick entries dynamically
+async function refreshQEList() {
+  const entries = await fetch('/api/quickentries').then(r=>r.json());
+  const cur = '{{ cfg.currency or "€" }}';
+  const el = document.getElementById('qeList');
+  if (!entries.length) { el.innerHTML = '<p class="muted" style="font-size:13px">Noch keine Schnelleingaben.</p>'; return; }
+  el.innerHTML = entries.map(q => `
+    <div class="quick-entry-item">
+      <span style="font-size:20px;width:28px;text-align:center">${escHtml(q.emoji||'⚡')}</span>
+      <div style="flex:1">
+        <div style="font-size:13px;font-weight:600">${escHtml(q.name)}</div>
+        <div style="font-size:11px;color:var(--vault-ink-muted-48)">${parseFloat(q.amount).toFixed(2)} ${cur} · ${q.type==='expense'?'Ausgabe':'Einnahme'}</div>
+      </div>
+      <div class="tx-actions">
+        <button class="icon-btn" onclick="openEditQE(${q.id})">✏️</button>
+        <button class="icon-btn danger" onclick="deleteQE(${q.id})">🗑️</button>
+      </div>
+    </div>`).join('');
+}
+</script>
+{% endblock %}

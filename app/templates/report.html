@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+{% block title %}Monatsbericht – Finance Vault{% endblock %}
+{% block content %}
+
+<div class="v2-hero">
+  <div class="v2-hero-inner">
+    <div>
+      <div class="v2-eyebrow">Monatsauswertung</div>
+      <h1 class="v2-title" id="reportSub">Monatsbericht.</h1>
+      <p class="v2-sub">Detaillierte Übersicht deiner Finanzen</p>
+    </div>
+    <div class="v2-actions">
+      <input type="month" id="monthPicker" class="v2-input"
+             value="{{ today.strftime('%Y-%m') }}"
+             onchange="loadReport()" style="height:38px;padding:0 12px">
+      <a id="csvLink" class="btn-ghost" href="#" style="display:none">CSV Export</a>
+    </div>
+  </div>
+</div>
+
+<div class="v2-body">
+  <div id="reportContent">
+    <div class="v2-card">
+      <div class="empty-state">
+        <p style="font-size:2rem;margin:0 0 10px">📋</p>
+        <h4>Monat auswählen</h4>
+        <p>Wähle oben einen Monat um den Bericht zu laden.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+async function loadReport() {
+  const ym = document.getElementById('monthPicker').value;
+  if (!ym) return;
+  const content = document.getElementById('reportContent');
+  content.innerHTML = '<div class="loading-state"><div class="spinner"></div><p>Lade Bericht…</p></div>';
+
+  const data = await (await fetch(`/api/report?month=${ym}`)).json();
+  document.getElementById('reportSub').textContent = data.month_label || 'Monatsbericht';
+
+  const csvLink = document.getElementById('csvLink');
+  csvLink.href = `/api/report/csv?month=${ym}`;
+  csvLink.style.display = '';
+
+  const s = data.summary;
+  const cur = '{{ cfg.currency or "€" }}';
+
+  const txRows = (data.transactions || []).map(t => `
+    <tr>
+      <td style="font-size:12px;color:var(--vault-ink-muted-48)">${t.date_display}</td>
+      <td>${escHtml(t.display_desc || t.description || '')}</td>
+      <td><span class="cat-pill">${escHtml(t.category_name || '—')}</span></td>
+      <td>${(t.tags||[]).map(tg=>`<span class="tag-chip">#${escHtml(tg)}</span>`).join('')}</td>
+      <td class="num" style="color:${t.type==='income'?'var(--finance-positive)':'var(--finance-negative)'}">
+        ${t.type==='income'?'+':'−'}${t.amount.toLocaleString('de-DE',{minimumFractionDigits:2})} ${cur}
+      </td>
+    </tr>`).join('');
+
+  const catRows = (data.category_breakdown || []).map(c => `
+    <tr>
+      <td>${escHtml(c.emoji||'')} ${escHtml(c.name)}</td>
+      <td class="num" style="font-weight:600">${c.amount.toLocaleString('de-DE',{minimumFractionDigits:2})} ${cur}</td>
+    </tr>`).join('');
+
+  content.innerHTML = `
+    <div class="v2-kpi" style="border:1px solid var(--vault-hairline);border-radius:var(--vault-r-lg);overflow:hidden;margin-bottom:20px">
+      <div class="v2-kpi-cell dark" style="--kpi-accent:var(--finance-positive-on-dark)">
+        <div class="v2-kpi-eyebrow">Einnahmen</div>
+        <div class="v2-kpi-value income-val">${s.income.toLocaleString('de-DE',{minimumFractionDigits:2})} ${cur}</div>
+      </div>
+      <div class="v2-kpi-cell light" style="--kpi-accent:var(--finance-negative)">
+        <div class="v2-kpi-eyebrow">Ausgaben</div>
+        <div class="v2-kpi-value expense-val">${s.expenses.toLocaleString('de-DE',{minimumFractionDigits:2})} ${cur}</div>
+      </div>
+      <div class="v2-kpi-cell dark" style="--kpi-accent:var(--vault-primary-on-dark)">
+        <div class="v2-kpi-eyebrow">Bilanz</div>
+        <div class="v2-kpi-value ${s.balance>=0?'income-val':'expense-val'}">${s.balance>=0?'+':''}${s.balance.toLocaleString('de-DE',{minimumFractionDigits:2})} ${cur}</div>
+      </div>
+      <div class="v2-kpi-cell light">
+        <div class="v2-kpi-eyebrow">Buchungen</div>
+        <div class="v2-kpi-value">${s.count}</div>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 260px;gap:16px;align-items:start">
+      <div class="v2-card" style="margin:0;padding:0;overflow:hidden">
+        <div class="v2-card-head" style="padding:18px 20px 0"><h3>Alle Transaktionen</h3></div>
+        <div style="overflow-x:auto;max-height:480px;overflow-y:auto">
+          <table class="tbl">
+            <thead>
+              <tr>
+                <th class="first">Datum</th>
+                <th>Beschreibung</th>
+                <th>Kategorie</th>
+                <th>Tags</th>
+                <th class="last" style="text-align:right">Betrag</th>
+              </tr>
+            </thead>
+            <tbody>${txRows || '<tr><td colspan="5" class="empty-state" style="padding:2rem"><p>Keine Transaktionen</p></td></tr>'}</tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="v2-card" style="margin:0;padding:0;overflow:hidden">
+        <div class="v2-card-head" style="padding:18px 20px 0"><h3>Nach Kategorie</h3></div>
+        <table class="tbl">
+          <thead><tr><th class="first">Kategorie</th><th class="last" style="text-align:right">Betrag</th></tr></thead>
+          <tbody>${catRows || '<tr><td colspan="2" class="muted" style="padding:1rem 20px">Keine Kategorien</td></tr>'}</tbody>
+        </table>
+      </div>
+    </div>
+  `;
+
+  // Trigger KPI accent bars
+  setTimeout(() => {
+    content.querySelectorAll('.v2-kpi-cell').forEach(el => el.classList.add('loaded'));
+  }, 50);
+  
+  // Responsive: stack on mobile
+  if (window.innerWidth < 700) {
+    const grid = content.querySelector('[style*="grid-template-columns"]');
+    if (grid) grid.style.gridTemplateColumns = '1fr';
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  loadReport(); // auto-load current month
+});
+</script>
+{% endblock %}

@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block title %}Übersicht – Finance Vault{% endblock %}
+{% block content %}
+{% set cur = cfg.currency or '€' %}
+
+<div class="v2-hero">
+  <div class="v2-hero-inner">
+    <div>
+      <div class="v2-eyebrow">{{ month_name }} · Übersicht</div>
+      <h1 class="v2-title">Guten Tag.</h1>
+      <p class="v2-sub">Deine Finanzen auf einen Blick{% if auto_created > 0 %} · <span style="color:var(--finance-positive)">{{ auto_created }} wiederkehrende Buchungen eingetragen</span>{% endif %}</p>
+    </div>
+    <div class="v2-actions">
+      <button class="btn-ghost" onclick="openAddTx('income')">+ Einnahme</button>
+      <button class="btn-primary" onclick="openAddTx('expense')">+ Ausgabe buchen</button>
+    </div>
+  </div>
+</div>
+
+<div class="v2-kpi">
+  <div class="v2-kpi-cell dark" style="--i:0;--kpi-accent:var(--finance-positive-on-dark)">
+    <div class="v2-kpi-eyebrow">Einnahmen</div>
+    <div class="v2-kpi-value income-val">{{ '%.2f'|format(income) }} {{ cur }}</div>
+  </div>
+  <div class="v2-kpi-cell light" style="--i:1;--kpi-accent:var(--finance-negative)">
+    <div class="v2-kpi-eyebrow">Ausgaben</div>
+    <div class="v2-kpi-value expense-val">{{ '%.2f'|format(expenses) }} {{ cur }}</div>
+  </div>
+  <div class="v2-kpi-cell dark" style="--i:2;--kpi-accent:var(--vault-primary-on-dark)">
+    <div class="v2-kpi-eyebrow">Bilanz {{ month_name }}</div>
+    <div class="v2-kpi-value {{ 'income-val' if balance >= 0 else 'expense-val' }}">{{ '+' if balance >= 0 else '' }}{{ '%.2f'|format(balance) }} {{ cur }}</div>
+  </div>
+  <div class="v2-kpi-cell light" style="--i:3;--kpi-accent:var(--finance-warn)">
+    <div class="v2-kpi-eyebrow">Sparquote</div>
+    <div class="v2-kpi-value {{ 'income-val' if savings_rate >= 20 else ('warning-val' if savings_rate >= 0 else 'expense-val') }}">{{ savings_rate }}%</div>
+  </div>
+</div>
+
+<div class="v2-body">
+  <div class="v2-grid">
+    <div class="v2-card">
+      <div class="v2-card-head"><h3>Monatsverlauf</h3><span class="sub">{{ month_name }}</span></div>
+      <div style="height:220px;position:relative"><canvas id="dashChart"></canvas></div>
+    </div>
+    <div class="v2-card">
+      <div class="v2-card-head"><h3>Budget-Status</h3><a class="btn-link" href="/budget">Details →</a></div>
+      {% if warnings %}
+      <div class="warnings-list">
+        {% for w in warnings[:5] %}
+        <div class="warning-item {{ w.status }}">
+          <span class="w-emoji">{{ w.emoji }}</span>
+          <div class="w-info">
+            <span class="w-name">{{ w.category }}</span>
+            <div class="w-bar-wrap"><div class="w-bar" style="width:{{ [w.pct,100]|min }}%;background:{{ w.color }}"></div></div>
+          </div>
+          <div class="w-nums">
+            <span class="w-pct {{ w.status }}">{{ w.pct }}%</span>
+            <span class="w-detail">{{ '%.0f'|format(w.spent) }} / {{ '%.0f'|format(w.limit) }} {{ cur }}</span>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="empty-state" style="padding:2rem 1rem"><p style="font-size:1.5rem;margin:0 0 8px">✓</p><p>Alle Budgets im grünen Bereich</p></div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="v2-card" style="margin-top:20px">
+    <div class="v2-card-head"><h3>Letzte Transaktionen</h3><a class="btn-link" href="/transactions">Alle ansehen →</a></div>
+    {% if recent %}
+    <div class="v2-tx-list">
+      {% for t in recent %}
+      <div class="v2-tx-item">
+        <div class="v2-tx-icon" style="background:{{ t.category.color + '22' if t.category else 'var(--vault-canvas-parchment)' }}">
+          {% if t.image_path %}<img src="{{ t.image_path }}" alt="">
+          {% else %}{{ t.emoji or (t.category.emoji if t.category else '💳') }}{% endif %}
+        </div>
+        <div class="v2-tx-info">
+          <span class="v2-tx-desc">{{ t._clean_desc() }}</span>
+          <span class="v2-tx-meta">{{ t.date.strftime('%d.%m.%Y') }}{% if t.category %} · <span class="cat-pill">{{ t.category.emoji }} {{ t.category.name }}</span>{% endif %}</span>
+        </div>
+        <span class="v2-tx-amount {{ t.type }}">{{ '+' if t.type == 'income' else '−' }}{{ '%.2f'|format(t.amount) }} {{ cur }}</span>
+        <div class="tx-actions">
+          <button class="icon-btn" onclick="openEditTx({{ t.id }})">✏️</button>
+          <button class="icon-btn danger" onclick="deleteTx({{ t.id }})">🗑️</button>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state"><p style="font-size:2rem;margin:0 0 8px">💳</p><h4>Noch keine Transaktionen</h4><p>Füge deine erste Einnahme oder Ausgabe hinzu.</p></div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+  const resp = await fetch('/api/analytics?period=month');
+  const data = await resp.json();
+  const ctx = document.getElementById('dashChart')?.getContext('2d');
+  if (ctx && data.series?.length) makeBarChart(ctx, data.series.map(m=>m.label), data.series.map(m=>m.income), data.series.map(m=>m.expenses));
+  // Animate KPI accent lines
+  requestAnimationFrame(() => document.querySelectorAll('.v2-kpi-cell').forEach(c => c.classList.add('loaded')));
+});
+</script>
+{% endblock %}

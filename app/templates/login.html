@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Finance Vault – Anmelden</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body style="background:#0f0f10;background-image:none">
+
+<div class="login-page">
+  <!-- Art Side -->
+  <div class="login-art">
+    <div class="login-art-logo">
+      <img src="{{ url_for('static', filename='vault-logo.png') }}" alt="Finance Vault">
+      <span class="login-art-logo-name">Finance Vault</span>
+    </div>
+    <div>
+      <p class="login-art-tagline">Dein Geld.<br>Dein Überblick.</p>
+      <p class="login-art-sub">Budgets, Transaktionen und Sparziele — privat und lokal.</p>
+    </div>
+    <p class="login-art-foot">Finance Vault · Sicher & privat</p>
+  </div>
+
+  <!-- Form Side -->
+  <div class="login-form-wrap">
+    <div class="login-form">
+      <h1 class="login-form-title">Willkommen zurück</h1>
+      <p class="login-form-sub">Melde dich an um fortzufahren.</p>
+
+      {% if error %}
+      <div class="login-error">{{ error }}</div>
+      {% endif %}
+      {% if locked %}
+      <div class="login-locked">Konto vorübergehend gesperrt. Bitte warte einige Minuten.</div>
+      {% endif %}
+
+      <form method="POST" action="/login">
+        <div class="form-group">
+          <label for="username">Benutzername</label>
+          <input type="text" id="username" name="username" placeholder="admin"
+                 autocomplete="username" required {% if locked %}disabled{% endif %}
+                 class="v2-input" style="width:100%;height:44px;font-size:15px">
+        </div>
+        <div class="form-group" style="margin-top:14px">
+          <label for="pwInput">Passwort</label>
+          <div style="position:relative;display:flex;align-items:center">
+            <input type="password" id="pwInput" name="password" placeholder="••••••••"
+                   autocomplete="current-password" required {% if locked %}disabled{% endif %}
+                   class="v2-input" style="width:100%;height:44px;font-size:15px;padding-right:44px">
+            <button type="button" onclick="togglePw()"
+                    style="position:absolute;right:12px;background:none;border:none;cursor:pointer;color:var(--vault-ink-muted-48);font-size:16px"
+                    aria-label="Passwort anzeigen">👁</button>
+          </div>
+        </div>
+        <div class="remember-row" style="margin-top:14px">
+          <input type="checkbox" name="remember" id="rememberMe">
+          <label for="rememberMe">Angemeldet bleiben (30 Tage)</label>
+        </div>
+        <button type="submit" class="login-btn" style="margin-top:20px" {% if locked %}disabled{% endif %}>
+          Anmelden →
+        </button>
+      </form>
+
+      <p class="login-hint" style="margin-top:24px">
+        Erster Start? Standard: <code style="background:rgba(255,255,255,0.08);padding:2px 6px;border-radius:4px">admin / vault1234</code><br>
+        Passwort nach dem Login in den Einstellungen ändern.
+      </p>
+    </div>
+  </div>
+</div>
+
+<script>
+  const t = localStorage.getItem('theme') || 'dark';
+  document.documentElement.setAttribute('data-theme', t);
+  function togglePw() {
+    const inp = document.getElementById('pwInput');
+    inp.type = inp.type === 'password' ? 'text' : 'password';
+  }
+</script>
+</body>
+</html>

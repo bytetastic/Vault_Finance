@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% block title %}Finance Vault{% endblock %}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+
+<canvas id="bg-canvas" aria-hidden="true"></canvas>
+
+<div class="layout" id="appLayout">
+  <aside class="sb" id="sidebar" role="navigation" aria-label="Hauptnavigation">
+
+    <!-- Brand -->
+    <div class="sb-brand">
+      <div class="sb-mark">
+        <img src="{{ url_for('static', filename='vault-logo.png') }}" alt="Finance Vault">
+      </div>
+      <span class="sb-wordmark">Finance Vault</span>
+    </div>
+
+    <!-- Navigation -->
+    <nav class="sb-nav">
+      <a href="/"             class="sb-item {% if request.endpoint=='main.dashboard'      %}active{% endif %}" aria-label="Übersicht">
+        <span class="sb-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg></span>
+        <span class="sb-label">Übersicht</span>
+        <span class="sb-tooltip">Übersicht</span>
+      </a>
+      <a href="/transactions" class="sb-item {% if request.endpoint=='main.transactions'   %}active{% endif %}" aria-label="Transaktionen">
+        <span class="sb-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="3" cy="6" r="1" fill="currentColor"/><circle cx="3" cy="12" r="1" fill="currentColor"/><circle cx="3" cy="18" r="1" fill="currentColor"/></svg></span>
+        <span class="sb-label">Transaktionen</span>
+        <span class="sb-tooltip">Transaktionen</span>
+      </a>
+      <a href="/analytics"    class="sb-item {% if request.endpoint=='main.analytics'      %}active{% endif %}" aria-label="Analytik">
+        <span class="sb-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></span>
+        <span class="sb-label">Analytik</span>
+        <span class="sb-tooltip">Analytik</span>
+      </a>
+      <a href="/budget"       class="sb-item {% if request.endpoint=='main.budget'         %}active{% endif %}" aria-label="Budget">
+        <span class="sb-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg></span>
+        <span class="sb-label">Budget</span>
+        <span class="sb-tooltip">Budget</span>
+      </a>
+      <a href="/savings"      class="sb-item {% if request.endpoint=='main.savings_page'   %}active{% endif %}" aria-label="Sparziele">
+        <span class="sb-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z"/><circle cx="12" cy="12" r="3"/></svg></span>
+        <span class="sb-label">Sparziele</span>
+        <span class="sb-tooltip">Sparziele</span>
+      </a>
+      <a href="/report"       class="sb-item {% if request.endpoint=='main.report_page'    %}active{% endif %}" aria-label="Monatsbericht">
+        <span class="sb-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span>
+        <span class="sb-label">Monatsbericht</span>
+        <span class="sb-tooltip">Monatsbericht</span>
+      </a>
+      <a href="/documents"    class="sb-item {% if request.endpoint=='main.documents_page' %}active{% endif %}" aria-label="Dokumente">
+        <span class="sb-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></span>
+        <span class="sb-label">Dokumente</span>
+        <span class="sb-tooltip">Dokumente</span>
+      </a>
+      <a href="/settings"     class="sb-item {% if request.endpoint=='main.settings'       %}active{% endif %}" aria-label="Einstellungen">
+        <span class="sb-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>
+        <span class="sb-label">Einstellungen</span>
+        <span class="sb-tooltip">Einstellungen</span>
+      </a>
+    </nav>
+
+    <!-- Footer: Theme + Logout + User -->
+    <div class="sb-foot">
+      <button class="sb-item" onclick="toggleTheme()" id="themeBtn" aria-label="Theme wechseln">
+        <span class="sb-icon" id="themeIcon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+        </span>
+        <span class="sb-label" id="themeLabel">Light Mode</span>
+        <span class="sb-tooltip" id="themeTooltip">Light Mode</span>
+      </button>
+      <a href="/logout" class="sb-item" aria-label="Abmelden" style="color:#ff6b62;">
+        <span class="sb-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></span>
+        <span class="sb-label">Abmelden</span>
+        <span class="sb-tooltip">Abmelden</span>
+      </a>
+    </div>
+
+    <!-- User info at bottom -->
+    <div class="sb-user">
+      <div class="sb-avatar" id="sbAvatar">{{ current_user.username[0].upper() if current_user.is_authenticated else "V" }}</div>
+      <div class="sb-user-info">
+        <div class="sb-user-name">{{ current_user.username if current_user.is_authenticated else "Vault" }}</div>
+        <div class="sb-user-sub">Finance Vault</div>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main" id="mainContent">
+    <div class="section page-enter">
+      {% block content %}{% endblock %}
+    </div>
+  </main>
+</div>
+
+<div id="toasts"></div>
+<div class="modal-backdrop" id="modalBackdrop" onclick="closeModal()"></div>
+
+{% block page_modals %}{% endblock %}
+
+<!-- ── Transaction Modal ── -->
+<div class="modal" id="txModal">
+  <div class="modal-header">
+    <h2 class="modal-title" id="txModalTitle">Transaktion hinzufügen</h2>
+    <button class="modal-close" onclick="closeModal()">✕</button>
+  </div>
+  <!-- Quick entries -->
+  <div id="quickEntryBar" style="display:none;margin-bottom:1rem">
+    <p style="font-size:.72rem;color:var(--text-3);margin-bottom:.4rem;text-transform:uppercase;letter-spacing:.06em;font-weight:700">⚡ Schnelleingabe</p>
+    <div id="quickEntryBtns" style="display:flex;gap:.4rem;flex-wrap:wrap"></div>
+  </div>
+  <div class="tx-type-toggle">
+    <button class="type-btn expense active" id="btnExpense" onclick="setTxType('expense')">📤 Ausgabe</button>
+    <button class="type-btn income"         id="btnIncome"  onclick="setTxType('income')">📥 Einnahme</button>
+  </div>
+  <form id="txForm" onsubmit="saveTx(event)">
+    <input type="hidden" id="txId">
+    <input type="hidden" id="txType" value="expense">
+    <input type="hidden" id="txImagePath">
+    <div class="form-row">
+      <div class="form-group" style="flex:1">
+        <label>Betrag *</label>
+        <div class="input-prefix">
+          <span class="prefix" id="currencyPrefix">€</span>
+          <input type="number" id="txAmount" step="0.01" min="0.01" placeholder="0.00" required>
+        </div>
+      </div>
+      <div class="form-group" style="flex:1">
+        <label>Datum *</label>
+        <input type="date" id="txDate" required>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Beschreibung</label>
+      <div class="desc-row">
+        <input type="text" id="txDesc" placeholder="z.B. Wocheneinkauf Rewe" maxlength="200">
+        <button type="button" class="emoji-trigger" onclick="toggleEmojiPicker()">😊</button>
+        <div class="upload-btn-wrap">
+          <button type="button" class="icon-btn" onclick="document.getElementById('txImgIn').click()">🖼️</button>
+          <input type="file" id="txImgIn" accept=".png,.jpg,.jpeg,.gif,.webp" style="display:none" onchange="handleImageUpload(event)">
+        </div>
+      </div>
+      <div id="emojiPicker" class="emoji-picker hidden"></div>
+      <div id="txImagePreview" class="image-preview hidden"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group" style="flex:0 0 90px">
+        <label>Emoji</label>
+        <input type="text" id="txEmoji" placeholder="🛒" maxlength="4" readonly style="cursor:pointer;text-align:center;font-size:1.3rem" onclick="toggleEmojiPicker()">
+      </div>
+      <div class="form-group" style="flex:2">
+        <label>Kategorie</label>
+        <select id="txCategory"><option value="">Ohne Kategorie</option></select>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Tags <span style="color:var(--text-3);font-weight:400;font-size:.7rem">(optional, z.B. urlaub, arbeit)</span></label>
+      <input type="text" id="txTags" placeholder="#urlaub #arbeit" autocomplete="off">
+      <div id="tagSuggestions" style="display:flex;gap:.3rem;flex-wrap:wrap;margin-top:.35rem"></div>
+    </div>
+    <div class="form-group">
+      <label>Notiz</label>
+      <textarea id="txNote" rows="2" placeholder="Optionale Notiz…" maxlength="500"></textarea>
+    </div>
+    <div class="form-group" id="budgetMonthWrap">
+      <label>📅 Budget-Monat (optional)</label>
+      <input type="month" id="txBudgetMonth" placeholder="YYYY-MM">
+      <small style="color:var(--text-2);font-size:.75rem">Wenn diese Buchung einem anderen Monat zugeordnet werden soll (z.B. Miete am 29. für nächsten Monat, oder Gehalt das vorgezogen wurde)</small>
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn-ghost" onclick="closeModal()">Abbrechen</button>
+      <button type="submit" class="btn-primary" id="txSaveBtn">Speichern</button>
+    </div>
+  </form>
+</div>
+
+<!-- ── Category Modal ── -->
+<div class="modal" id="catModal">
+  <div class="modal-header">
+    <h2 class="modal-title" id="catModalTitle">Kategorie hinzufügen</h2>
+    <button class="modal-close" onclick="closeModal()">✕</button>
+  </div>
+  <form id="catForm" onsubmit="saveCat(event)">
+    <input type="hidden" id="catId">
+    <div class="form-row">
+      <div class="form-group" style="flex:0 0 80px">
+        <label>Emoji</label>
+        <input type="text" id="catEmoji" placeholder="📁" maxlength="4" style="font-size:1.5rem;text-align:center">
+      </div>
+      <div class="form-group" style="flex:1">
+        <label>Name *</label>
+        <input type="text" id="catName" placeholder="Kategoriename" required maxlength="80">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group" style="flex:1">
+        <label>Farbe</label>
+        <input type="color" id="catColor" value="#22d3a0">
+      </div>
+      <div class="form-group" style="flex:1">
+        <label>Typ</label>
+        <select id="catType" onchange="toggleIncomeType()">
+          <option value="expense">Ausgabe</option>
+          <option value="income">Einnahme</option>
+          <option value="both">Beides</option>
+        </select>
+      </div>
+      <div class="form-group" style="flex:1" id="incomeTypeWrap">
+        <label>Einnahme-Art</label>
+        <select id="catIncomeType">
+          <option value="regular">Regelmäßig</option>
+          <option value="unplanned">Ungeplant</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group" style="flex:1">
+        <label>Budget/Monat (€) – 0 = kein Limit</label>
+        <input type="number" id="catBudget" min="0" step="0.01" placeholder="0">
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn-ghost" onclick="closeModal()">Abbrechen</button>
+      <button type="submit" class="btn-primary">Speichern</button>
+    </div>
+  </form>
+</div>
+
+<!-- ── Recurring Modal ── -->
+<div class="modal" id="recModal">
+  <div class="modal-header">
+    <h2 class="modal-title" id="recModalTitle">Wiederkehrende Transaktion</h2>
+    <button class="modal-close" onclick="closeModal()">✕</button>
+  </div>
+  <form id="recForm" onsubmit="saveRecurring(event)">
+    <input type="hidden" id="recId">
+    <div class="tx-type-toggle">
+      <button type="button" class="type-btn expense active" id="recBtnExpense" onclick="setRecType('expense')">📤 Ausgabe</button>
+      <button type="button" class="type-btn income"         id="recBtnIncome"  onclick="setRecType('income')">📥 Einnahme</button>
+    </div>
+    <input type="hidden" id="recType" value="expense">
+    <div class="form-row">
+      <div class="form-group" style="flex:0 0 60px"><label>Emoji</label><input type="text" id="recEmoji" placeholder="🔄" maxlength="4" style="text-align:center;font-size:1.3rem"></div>
+      <div class="form-group" style="flex:2"><label>Name *</label><input type="text" id="recName" placeholder="z.B. Miete, Netflix…" required maxlength="200"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group" style="flex:1">
+        <label>Betrag *</label>
+        <div class="input-prefix"><span class="prefix">€</span><input type="number" id="recAmount" step="0.01" min="0.01" required></div>
+      </div>
+      <div class="form-group" style="flex:1">
+        <label>Kategorie</label>
+        <select id="recCategory"><option value="">Ohne Kategorie</option></select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group" style="flex:1">
+        <label>Häufigkeit</label>
+        <select id="recFreq">
+          <option value="daily">Täglich</option>
+          <option value="weekly">Wöchentlich</option>
+          <option value="biweekly">2-wöchentlich</option>
+          <option value="monthly" selected>Monatlich</option>
+          <option value="quarterly">Vierteljährlich</option>
+          <option value="yearly">Jährlich</option>
+        </select>
+      </div>
+      <div class="form-group" style="flex:1">
+        <label>Startdatum</label>
+        <input type="date" id="recStart" required>
+      </div>
+      <div class="form-group" style="flex:1">
+        <label>Enddatum (optional)</label>
+        <input type="date" id="recEnd">
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Notiz</label>
+      <textarea id="recNote" rows="2" placeholder="Optional…" maxlength="500"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn-ghost" onclick="closeModal()">Abbrechen</button>
+      <button type="submit" class="btn-primary">Speichern</button>
+    </div>
+  </form>
+</div>
+
+<!-- ── Confirm Modal ── -->
+<div class="modal modal-sm" id="confirmModal">
+  <div class="modal-header">
+    <h2 class="modal-title">Bestätigung</h2>
+    <button class="modal-close" onclick="closeModal()">✕</button>
+  </div>
+  <p id="confirmMsg" style="margin:0 0 1.5rem;color:var(--text-2)"></p>
+  <div class="modal-actions">
+    <button type="button" class="btn-ghost"  onclick="closeModal()">Abbrechen</button>
+    <button type="button" class="btn-danger" id="confirmOkBtn">Löschen</button>
+  </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

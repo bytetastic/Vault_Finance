@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1a1a1c"/>
+      <stop offset="100%" stop-color="#0f0f10"/>
+    </linearGradient>
+    <linearGradient id="green" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2a9a54"/>
+      <stop offset="100%" stop-color="#1f7a44"/>
+    </linearGradient>
+    <linearGradient id="ring" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3a3a3c"/>
+      <stop offset="100%" stop-color="#2a2a2c"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background rounded square -->
+  <rect width="200" height="200" rx="42" fill="url(#bg)"/>
+
+  <!-- Subtle inner border -->
+  <rect x="1.5" y="1.5" width="197" height="197" rx="41" fill="none"
+        stroke="rgba(255,255,255,0.07)" stroke-width="1.5"/>
+
+  <!-- Vault door outer ring -->
+  <circle cx="100" cy="100" r="68" fill="url(#ring)" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+
+  <!-- Vault door middle ring (groove) -->
+  <circle cx="100" cy="100" r="54" fill="#1a1a1c" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>
+
+  <!-- Green accent ring -->
+  <circle cx="100" cy="100" r="48" fill="none" stroke="url(#green)" stroke-width="3.5"/>
+
+  <!-- Vault bolts at N/E/S/W -->
+  <circle cx="100" cy="33" r="5.5" fill="#2a2a2c" stroke="#3a3a3c" stroke-width="1.5"/>
+  <circle cx="167" cy="100" r="5.5" fill="#2a2a2c" stroke="#3a3a3c" stroke-width="1.5"/>
+  <circle cx="100" cy="167" r="5.5" fill="#2a2a2c" stroke="#3a3a3c" stroke-width="1.5"/>
+  <circle cx="33" cy="100" r="5.5" fill="#2a2a2c" stroke="#3a3a3c" stroke-width="1.5"/>
+
+  <!-- Center handle circle -->
+  <circle cx="100" cy="100" r="19" fill="#0f0f10" stroke="#3a3a3c" stroke-width="2"/>
+  <circle cx="100" cy="100" r="9" fill="url(#green)"/>
+
+  <!-- Handle spokes -->
+  <line x1="100" y1="81" x2="100" y2="75" stroke="#3a3a3c" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="100" y1="119" x2="100" y2="125" stroke="#3a3a3c" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="119" y1="100" x2="125" y2="100" stroke="#3a3a3c" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="81" y1="100" x2="75" y2="100" stroke="#3a3a3c" stroke-width="2.5" stroke-linecap="round"/>
+
+  <!-- V monogram (subtle, overlaid) -->
+  <text x="100" y="110" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', Inter, sans-serif"
+        font-size="22" font-weight="700" fill="rgba(255,255,255,0.0)" letter-spacing="-1">V</text>
+</svg>

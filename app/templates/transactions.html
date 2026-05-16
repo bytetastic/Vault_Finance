@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+{% block title %}Transaktionen – Finance Vault{% endblock %}
+{% block content %}
+{% set cur = cfg.currency or '€' %}
+
+<div class="v2-hero">
+  <div class="v2-hero-inner">
+    <div>
+      <div class="v2-eyebrow">Buchungsübersicht</div>
+      <h1 class="v2-title">Transaktionen.</h1>
+      <p class="v2-sub">Alle Einnahmen und Ausgaben im Überblick</p>
+    </div>
+    <div class="v2-actions">
+      <button class="btn-ghost" onclick="openAddTx('income')">+ Einnahme</button>
+      <button class="btn-primary" onclick="openAddTx('expense')">+ Ausgabe</button>
+    </div>
+  </div>
+</div>
+
+<div class="v2-body">
+  <!-- Filter Bar -->
+  <div class="v2-card" style="padding:18px 20px;margin-bottom:20px">
+    <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end">
+      <div class="filter-group">
+        <label>Typ</label>
+        <select id="fType" onchange="loadTx()">
+          <option value="">Alle</option>
+          <option value="expense">Ausgaben</option>
+          <option value="income">Einnahmen</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>Kategorie</label>
+        <select id="fCat" onchange="loadTx()">
+          <option value="">Alle</option>
+          {% for c in categories %}
+          <option value="{{ c.id }}">{{ c.emoji }} {{ c.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>Von</label>
+        <input type="date" id="fFrom" onchange="loadTx()">
+      </div>
+      <div class="filter-group">
+        <label>Bis</label>
+        <input type="date" id="fTo" onchange="loadTx()">
+      </div>
+      <div class="filter-group" style="flex:1;min-width:180px">
+        <label>Suche</label>
+        <input type="text" id="fSearch" placeholder="Beschreibung, Notiz…" oninput="loadTx()">
+      </div>
+      <button class="btn-ghost btn-sm" onclick="resetFilters()">Zurücksetzen</button>
+    </div>
+  </div>
+
+  <!-- Table -->
+  <div class="v2-card" style="padding:0;overflow:hidden">
+    <div id="txLoading" class="loading-state" style="display:none">
+      <div class="spinner"></div><p>Lade Transaktionen…</p>
+    </div>
+    <div class="tbl-wrap">
+      <table class="tbl" id="txTable">
+        <thead>
+          <tr>
+            <th class="first">Buchung</th>
+            <th>Kategorie</th>
+            <th>Datum</th>
+            <th style="text-align:right">Betrag</th>
+            <th class="last" style="text-align:right">Aktionen</th>
+          </tr>
+        </thead>
+        <tbody id="txBody">
+          <tr><td colspan="5" class="loading-state"><div class="spinner"></div></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="pagination hidden" id="txPagination">
+      <button class="pg-btn" id="pgPrev" onclick="changePage(-1)">← Zurück</button>
+      <span class="pg-info" id="pgInfo"></span>
+      <button class="pg-btn" id="pgNext" onclick="changePage(1)">Weiter →</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let _txPage = 1;
+const _perPage = 25;
+
+async function loadTx() {
+  const type   = document.getElementById('fType').value;
+  const cat    = document.getElementById('fCat').value;
+  const from   = document.getElementById('fFrom').value;
+  const to     = document.getElementById('fTo').value;
+  const search = document.getElementById('fSearch').value;
+  const body   = document.getElementById('txBody');
+  body.innerHTML = '<tr><td colspan="5" class="loading-state"><div class="spinner"></div></td></tr>';
+
+  let url = `/api/transactions?page=${_txPage}&per_page=${_perPage}`;
+  if (type)   url += `&type=${type}`;
+  if (cat)    url += `&category_id=${cat}`;
+  if (from)   url += `&date_from=${from}`;
+  if (to)     url += `&date_to=${to}`;
+  if (search) url += `&search=${encodeURIComponent(search)}`;
+
+  const data = await fetch(url).then(r=>r.json());
+  const cur = '{{ cur }}';
+  body.innerHTML = '';
+
+  if (!data.transactions?.length) {
+    body.innerHTML = '<tr><td colspan="5" class="empty-state" style="padding:2rem"><h4>Keine Buchungen gefunden</h4><p>Passe die Filter an oder füge Transaktionen hinzu.</p></td></tr>';
+    document.getElementById('txPagination').classList.add('hidden');
+    return;
+  }
+
+  data.transactions.forEach(t => {
+    const sign = t.type === 'income' ? '+' : '−';
+    const cls  = t.type === 'income' ? 'income-val' : 'expense-val';
+    const catHtml = t.category_name !== 'Ohne Kategorie'
+      ? `<span class="cat-pill">${escHtml(t.category_emoji)} ${escHtml(t.category_name)}</span>` : '—';
+    const tagsHtml = (t.tags||[]).map(tg=>`<span class="tag-chip">#${escHtml(tg)}</span>`).join('');
+    const noteHtml = t.note ? '<span class="note-badge" title="' + escHtml(t.note) + '">📝</span>' : '';
+    body.insertAdjacentHTML('beforeend', `
+      <tr onclick="openEditTx(${t.id})" style="cursor:pointer">
+        <td class="first">
+          <div style="display:flex;align-items:center;gap:10px">
+            <div class="tx-mark">${escHtml(t.emoji||t.category_emoji||'💳')}</div>
+            <div>
+              <div style="font-weight:500;font-size:13px">${escHtml(t.display_desc)}</div>
+              <div style="font-size:11px;color:var(--vault-ink-muted-48);margin-top:2px">${tagsHtml}${noteHtml}</div>
+            </div>
+          </div>
+        </td>
+        <td>${catHtml}</td>
+        <td style="font-size:12px;color:var(--vault-ink-muted-48)">${t.date_display}</td>
+        <td class="num"><span class="${cls}" style="font-size:13px;font-weight:600">${sign}${t.amount.toLocaleString('de-DE',{minimumFractionDigits:2})} ${cur}</span></td>
+        <td class="last">
+          <div class="tx-actions" onclick="event.stopPropagation()">
+            <button class="icon-btn" onclick="openEditTx(${t.id})">✏️</button>
+            <button class="icon-btn danger" onclick="deleteTx(${t.id})">🗑️</button>
+          </div>
+        </td>
+      </tr>`);
+  });
+
+  const pages = Math.ceil(data.total / _perPage);
+  const pag = document.getElementById('txPagination');
+  pag.classList.toggle('hidden', pages <= 1);
+  document.getElementById('pgInfo').textContent = `Seite ${_txPage} / ${pages} · ${data.total} Buchungen`;
+  document.getElementById('pgPrev').disabled = _txPage <= 1;
+  document.getElementById('pgNext').disabled = _txPage >= pages;
+}
+
+function changePage(d) { _txPage = Math.max(1, _txPage + d); loadTx(); }
+function resetFilters() {
+  ['fType','fCat','fFrom','fTo','fSearch'].forEach(id => { const el = document.getElementById(id); if(el) el.value=''; });
+  _txPage = 1; loadTx();
+}
+
+document.addEventListener('DOMContentLoaded', loadTx);
+</script>
+{% endblock %}

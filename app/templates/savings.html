@@ -1,0 +1,205 @@
+{% extends "base.html" %}
+{% block title %}Sparziele – Finance Vault{% endblock %}
+{% block content %}
+{% set cur = cfg.currency or '€' %}
+
+<div class="v2-hero">
+  <div class="v2-hero-inner">
+    <div>
+      <div class="v2-eyebrow">Sparziele</div>
+      <h1 class="v2-title">Sparziele.</h1>
+      <p class="v2-sub">Verfolge deine Finanzziele und spare gezielt</p>
+    </div>
+    <div class="v2-actions">
+      <button class="btn-primary" onclick="openAddGoal()">+ Ziel hinzufügen</button>
+    </div>
+  </div>
+</div>
+
+<div class="v2-body">
+  {% if goals %}
+  <div class="v2-grid v2-grid-auto">
+    {% for g in goals %}
+    {% set pct = [[(g.current_amount / g.target_amount * 100) if g.target_amount > 0 else 0, 0]|max, 100]|min %}
+    <div class="v2-card" style="cursor:pointer" onclick="openEditGoal({{ g.id }})">
+      <!-- Header -->
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+        <div style="width:44px;height:44px;border-radius:var(--vault-r-md);background:{{ g.color }}22;display:grid;place-items:center;font-size:22px;flex-shrink:0">{{ g.emoji or '🎯' }}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:600;font-size:15px;letter-spacing:-0.3px">{{ g.name }}</div>
+          {% if g.deadline %}
+          <div style="font-size:11px;color:var(--vault-ink-muted-48);margin-top:2px">Zieldatum: {{ g.deadline.strftime('%d.%m.%Y') }}</div>
+          {% endif %}
+        </div>
+        {% if g.current_amount >= g.target_amount %}
+        <span class="pill positive dot">Erreicht</span>
+        {% else %}
+        <span style="font-size:12px;font-weight:700;color:{{ g.color }}">{{ '%.1f'|format(pct) }}%</span>
+        {% endif %}
+      </div>
+
+      <!-- Progress bar -->
+      <div class="bar bar-thick" style="margin-bottom:10px">
+        <div class="bar-fill" style="width:{{ pct }}%;background:{{ g.color }}"></div>
+      </div>
+
+      <!-- Amounts -->
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px">
+        <span style="font-family:var(--vault-font-display);font-size:22px;font-weight:700;letter-spacing:-0.03em;color:{{ g.color }}">{{ '%.2f'|format(g.current_amount) }} {{ cur }}</span>
+        <span style="font-size:12px;color:var(--vault-ink-muted-48)">von {{ '%.2f'|format(g.target_amount) }} {{ cur }}</span>
+      </div>
+
+      {% if g.notes %}
+      <p style="font-size:12px;color:var(--vault-ink-muted-48);margin:0 0 12px;line-height:1.4">{{ g.notes }}</p>
+      {% endif %}
+
+      <!-- Actions -->
+      <div style="display:flex;gap:8px" onclick="event.stopPropagation()">
+        {% if g.current_amount < g.target_amount %}
+        <button class="btn-primary" style="font-size:12px;height:32px;padding:0 14px" onclick="openDepositModal({{ g.id }},'{{ g.name|e }}',{{ g.target_amount - g.current_amount }})">+ Einzahlen</button>
+        {% endif %}
+        <button class="btn-ghost" style="font-size:12px;height:32px;padding:0 14px" onclick="openEditGoal({{ g.id }})">Bearbeiten</button>
+        <button class="icon-btn danger" onclick="confirmDeleteGoal({{ g.id }},'{{ g.name|e }}')" title="Löschen">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+        </button>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  {% else %}
+  <div class="v2-card">
+    <div class="empty-state">
+      <p style="font-size:3rem;margin:0 0 12px">🎯</p>
+      <h4>Noch keine Sparziele</h4>
+      <p>Erstelle dein erstes Sparziel — für den Urlaub, ein neues Gerät oder den Notgroschen.</p>
+      <button class="btn-primary" style="margin-top:20px" onclick="openAddGoal()">+ Erstes Ziel erstellen</button>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+{% endblock %}
+
+{% block page_modals %}
+<!-- Goal Modal -->
+<div class="modal" id="goalModal">
+  <div class="modal-header">
+    <h2 class="modal-title" id="goalModalTitle">Neues Sparziel</h2>
+    <button class="modal-close" onclick="closeModal()">✕</button>
+  </div>
+  <form onsubmit="saveGoal(event)">
+    <input type="hidden" id="goalId">
+    <div class="form-row">
+      <div class="form-group" style="flex:0 0 80px"><label>Emoji</label><input type="text" id="goalEmoji" value="🎯" maxlength="4" style="text-align:center;font-size:1.4rem;width:100%"></div>
+      <div class="form-group" style="flex:1"><label>Name *</label><input type="text" id="goalName" placeholder="z.B. Urlaub 2025" required maxlength="100"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group" style="flex:1"><label>Zielbetrag *</label><div class="input-prefix"><span class="prefix">{{ cur }}</span><input type="number" id="goalTarget" step="0.01" min="1" required></div></div>
+      <div class="form-group" style="flex:1"><label>Bereits gespart</label><div class="input-prefix"><span class="prefix">{{ cur }}</span><input type="number" id="goalCurrent" step="0.01" min="0" value="0"></div></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group" style="flex:1"><label>Farbe</label><input type="color" id="goalColor" value="#22d3a0"></div>
+      <div class="form-group" style="flex:1"><label>Zieldatum (optional)</label><input type="date" id="goalDeadline"></div>
+    </div>
+    <div class="form-group"><label>Notiz</label><textarea id="goalNotes" rows="2" placeholder="Optional…"></textarea></div>
+    <div class="modal-actions">
+      <button type="button" class="btn-ghost" onclick="closeModal()">Abbrechen</button>
+      <button type="submit" class="btn-primary">Speichern</button>
+    </div>
+  </form>
+</div>
+
+<!-- Deposit Modal -->
+<div class="modal modal-sm" id="depositModal">
+  <div class="modal-header">
+    <h2 class="modal-title">Einzahlen</h2>
+    <button class="modal-close" onclick="closeModal()">✕</button>
+  </div>
+  <p id="depositGoalName" style="color:var(--vault-ink-muted-48);margin-bottom:1rem;font-size:13px"></p>
+  <input type="hidden" id="depositGoalId">
+  <div class="form-group"><label>Betrag *</label><div class="input-prefix"><span class="prefix">{{ cur }}</span><input type="number" id="depositAmount" step="0.01" min="0.01" placeholder="0.00"></div></div>
+  <div class="modal-actions">
+    <button class="btn-ghost" onclick="closeModal()">Abbrechen</button>
+    <button class="btn-primary" onclick="doDeposit()">Einzahlen</button>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function openAddGoal() {
+  document.getElementById('goalId').value = '';
+  document.getElementById('goalName').value = '';
+  document.getElementById('goalEmoji').value = '🎯';
+  document.getElementById('goalTarget').value = '';
+  document.getElementById('goalCurrent').value = '0';
+  document.getElementById('goalColor').value = '#22d3a0';
+  document.getElementById('goalDeadline').value = '';
+  document.getElementById('goalNotes').value = '';
+  document.getElementById('goalModalTitle').textContent = 'Neues Sparziel';
+  openModal('goalModal');
+}
+
+async function openEditGoal(id) {
+  const r = await (await fetch('/api/savings')).json();
+  const g = r.find(x => x.id === id);
+  if (!g) return;
+  document.getElementById('goalId').value      = g.id;
+  document.getElementById('goalName').value    = g.name;
+  document.getElementById('goalEmoji').value   = g.emoji;
+  document.getElementById('goalTarget').value  = g.target_amount;
+  document.getElementById('goalCurrent').value = g.current_amount;
+  document.getElementById('goalColor').value   = g.color;
+  document.getElementById('goalDeadline').value= g.deadline || '';
+  document.getElementById('goalNotes').value   = g.notes || '';
+  document.getElementById('goalModalTitle').textContent = 'Ziel bearbeiten';
+  openModal('goalModal');
+}
+
+async function saveGoal(e) {
+  e.preventDefault();
+  const id   = document.getElementById('goalId').value;
+  const body = {
+    name: document.getElementById('goalName').value,
+    emoji: document.getElementById('goalEmoji').value || '🎯',
+    color: document.getElementById('goalColor').value,
+    target_amount: parseFloat(document.getElementById('goalTarget').value),
+    current_amount: parseFloat(document.getElementById('goalCurrent').value) || 0,
+    deadline: document.getElementById('goalDeadline').value || null,
+    notes: document.getElementById('goalNotes').value,
+  };
+  const url = id ? `/api/savings/${id}` : '/api/savings';
+  const r = await (await fetch(url, {method: id?'PUT':'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)})).json();
+  if (r.success) { showToast('Gespeichert','success'); closeModal(); setTimeout(()=>location.reload(), 700); }
+  else showToast(r.error || 'Fehler', 'error');
+}
+
+function openDepositModal(id, name, remaining) {
+  document.getElementById('depositGoalId').value = id;
+  document.getElementById('depositGoalName').textContent = `${name} · noch ${remaining.toLocaleString('de-DE',{minimumFractionDigits:2})} € bis zum Ziel`;
+  document.getElementById('depositAmount').value = '';
+  openModal('depositModal');
+}
+
+async function doDeposit() {
+  const id     = document.getElementById('depositGoalId').value;
+  const amount = parseFloat(document.getElementById('depositAmount').value);
+  if (!amount || amount <= 0) { showToast('Bitte Betrag eingeben','warning'); return; }
+  const r = await (await fetch(`/api/savings/${id}/deposit`, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({amount})
+  })).json();
+  if (r.success) { showToast(`${amount.toLocaleString('de-DE',{minimumFractionDigits:2})} € eingetragen`,'success'); closeModal(); setTimeout(()=>location.reload(), 700); }
+  else showToast(r.error || 'Fehler','error');
+}
+
+function confirmDeleteGoal(id, name) {
+  showConfirm(`Sparziel "${name}" löschen?`, async () => {
+    const r = await (await fetch(`/api/savings/${id}`,{method:'DELETE'})).json();
+    if (r.success) { showToast('Gelöscht','success'); setTimeout(()=>location.reload(), 700); }
+    else showToast(r.error,'error');
+  });
+}
+</script>
+{% endblock %}
