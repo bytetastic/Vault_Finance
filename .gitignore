@@ -1,9 +1,5 @@
 # ═══════════════════════════════════════════════════════
 #  Finance Vault — .gitignore
-#  WICHTIG: Niemals persönliche Finanzdaten committen!
-# ═══════════════════════════════════════════════════════
-
-# ── Persönliche Daten (NIEMALS teilen!) ─────────────────
 data/finance.db
 data/finance.db-wal
 data/finance.db-shm
