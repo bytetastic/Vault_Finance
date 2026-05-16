@@ -6,6 +6,12 @@ Finance Vault läuft vollständig auf deinem eigenen Rechner. Keine Registrierun
 
 ---
 
+## ❗ Fix die Tage
+
+***- Persönliche Ansprache in der App***
+
+***- Diverse Bugs im Einstellungen Tab***
+
 ## ✨ Features
 
 | Bereich | Was du bekommst |
