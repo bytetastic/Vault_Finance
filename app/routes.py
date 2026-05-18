@@ -1122,7 +1122,7 @@ def _scan_csv(filepath):
     # Bank-specific overrides
     if bank in ('dkb_old', 'dkb_new'):
         col_date   = col(['buchungstag','buchungsdatum'])
-        col_payee  = col(['beguenstigter','begünstigter','auftraggeber'])
+        col_payee = next((i for i, h in enumerate(headers) if 'zahlungsempfänger' in h), None) or col(['beguenstigter', 'begünstigter', 'auftraggeber'])
         col_zweck  = col(['verwendungszweck'])
         col_amount = col(['betrag','glaeubiger id']) if col(['betrag']) is not None else col(['betrag'])
         col_amount = col(['betrag'])
